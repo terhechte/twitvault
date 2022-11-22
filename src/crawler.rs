@@ -305,6 +305,7 @@ async fn fetch_lists(
         }
 
         for list in lists {
+            info!("Fetching members for list {}", list.full_name);
             fetch_list_members(list, shared_storage.clone(), config, sender.clone()).await?;
         }
 
@@ -339,6 +340,7 @@ async fn fetch_list_members(
 
         let mut storage = shared_storage.lock().await;
 
+        info!("Processing {} members", resp.users.len());
         for member in &resp.users {
             if let Err(e) = inspect_profile(member, sender.clone()).await {
                 warn!("Could not inspect profile {e:?}");
