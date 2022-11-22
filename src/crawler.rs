@@ -180,6 +180,7 @@ async fn fetch_user_followers(
     sender: Sender<DownloadInstruction>,
 ) -> Result<()> {
     let ids = fetch_profiles_ids(
+        "followers",
         user::followers_ids(id, &config.token).with_page_size(50),
         shared_storage.clone(),
         config,
@@ -197,6 +198,7 @@ async fn fetch_user_follows(
     sender: Sender<DownloadInstruction>,
 ) -> Result<()> {
     let ids = fetch_profiles_ids(
+        "follows",
         user::friends_ids(id, &config.token).with_page_size(50),
         shared_storage.clone(),
         config,
@@ -210,6 +212,7 @@ async fn fetch_user_follows(
 // Helpers
 
 async fn fetch_profiles_ids(
+    kind: &'static str,
     mut cursor: cursor::CursorIter<cursor::IDCursor>,
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
@@ -217,6 +220,7 @@ async fn fetch_profiles_ids(
 ) -> Result<Vec<u64>> {
     let mut ids = Vec::new();
     loop {
+        info!("Downloading {kind} before {}", cursor.previous_cursor);
         let called = cursor.call();
         let resp = match called.await {
             Ok(n) => n,
@@ -237,7 +241,7 @@ async fn fetch_profiles_ids(
 
         ids.append(&mut new_ids);
 
-        handle_rate_limit(&resp.rate_limit_status, "Follows / Followers").await;
+        handle_rate_limit(&resp.rate_limit_status, kind).await;
         cursor.next_cursor = resp.response.next_cursor;
     }
 
@@ -264,6 +268,7 @@ async fn fetch_multiple_profiles_data(
         .filter(|id| !known_ids.contains(id))
         .copied()
         .collect();
+    info!("Downloading {} profiles", filtered.len());
     let profiles = user::lookup(filtered, &config.token).await?;
     for profile in profiles.iter() {
         inspect_profile(profile, sender.clone()).await?;

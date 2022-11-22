@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     setup_tracing();
     let config = helpers::Config::load().await?;
 
-    let Ok(storage_path) = PathBuf::from_str("archive") else { bail!("Invalid Path") };
+    let Ok(storage_path) = PathBuf::from_str(&format!("archive_{}", config.user_id)) else { bail!("Invalid Path") };
 
     info!("Found User {}", config.screen_name);
 
@@ -30,7 +30,9 @@ async fn main() -> Result<()> {
         Ok(existing) => existing,
         Err(e) => {
             info!("Crawling: Could not open storage: {e:?}.");
-            crawl_into_storage(config.clone(), &storage_path).await?
+            let storage = crawl_into_storage(config.clone(), &storage_path).await?;
+            println!("Saved data to {}", storage_path.display());
+            storage
         }
     };
 
