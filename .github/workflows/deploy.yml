@@ -1,0 +1,30 @@
+name: Deployment Build
+
+on: [workflow_dispatch]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  deploy:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macOS-latest]
+        include:
+          - os: macOS-latest
+            command: |
+                rustup target add x86_64-apple-darwin
+                cargo build --release --target=x86_64-apple-darwin
+                cd ../target/release/
+                /usr/bin/zip -5 -r ../../../twittalypse.zip ./twittalypse.app
+            binary: target/twittalypse.zip
+    steps:
+      - name: Production Build
+        uses: actions/checkout@v2
+      - run: ${{ matrix.command }}
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: dist
+          path: ${{ matrix.binary }}
