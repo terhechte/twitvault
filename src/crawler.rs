@@ -1,6 +1,5 @@
 use crate::storage::{List, Storage};
 use crate::types::Message;
-use egg_mode::Token;
 use egg_mode::{
     cursor,
     list::{self, ListID},
@@ -60,59 +59,55 @@ pub async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -
         }
     });
 
-    // msg("User Tweets", &sender).await?;
-    // fetch_user_tweets(
-    //     user_id,
-    //     shared_storage.clone(),
-    //     config,
-    //     instruction_sender.clone(),
-    // )
-    // .await?;
-    // save_data(&shared_storage).await;
-
-    // msg("User Mentions", &sender).await?;
-    // fetch_user_mentions(shared_storage.clone(), config, instruction_sender.clone()).await?;
-    // save_data(&shared_storage).await;
-
-    // msg("Followers", &sender).await?;
-    // fetch_user_followers(
-    //     user_id,
-    //     shared_storage.clone(),
-    //     config,
-    //     instruction_sender.clone(),
-    // )
-    // .await?;
-    // save_data(&shared_storage).await;
-
-    // msg("Follows", &sender).await?;
-    // fetch_user_follows(
-    //     user_id,
-    //     shared_storage.clone(),
-    //     config,
-    //     instruction_sender.clone(),
-    // )
-    // .await?;
-    // save_data(&shared_storage).await;
-
-    // msg("Lists", &sender).await?;
-    // fetch_lists(
-    //     user_id,
-    //     shared_storage.clone(),
-    //     config,
-    //     instruction_sender.clone(),
-    // )
-    // .await?;
-    // save_data(&shared_storage).await;
-
-    msg("Bookmarks", &sender).await?;
-    fetch_bookmarks(shared_storage.clone(), config, &instruction_sender).await?;
+    msg("User Tweets", &sender).await?;
+    fetch_user_tweets(
+        user_id,
+        shared_storage.clone(),
+        config,
+        instruction_sender.clone(),
+    )
+    .await?;
     save_data(&shared_storage).await;
 
-    instruction_sender.send(DownloadInstruction::Done);
+    msg("User Mentions", &sender).await?;
+    fetch_user_mentions(shared_storage.clone(), config, instruction_sender.clone()).await?;
+    save_data(&shared_storage).await;
+
+    msg("Followers", &sender).await?;
+    fetch_user_followers(
+        user_id,
+        shared_storage.clone(),
+        config,
+        instruction_sender.clone(),
+    )
+    .await?;
+    save_data(&shared_storage).await;
+
+    msg("Follows", &sender).await?;
+    fetch_user_follows(
+        user_id,
+        shared_storage.clone(),
+        config,
+        instruction_sender.clone(),
+    )
+    .await?;
+    save_data(&shared_storage).await;
+
+    msg("Lists", &sender).await?;
+    fetch_lists(
+        user_id,
+        shared_storage.clone(),
+        config,
+        instruction_sender.clone(),
+    )
+    .await?;
+    save_data(&shared_storage).await;
+
+    instruction_sender.send(DownloadInstruction::Done).await?;
     instruction_task.await?;
 
     let storage = shared_storage.lock_owned().await.clone();
-    sender.send(Message::Finished(storage));
+    sender.send(Message::Finished(storage)).await?;
 
     Ok(())
 }
@@ -495,7 +490,16 @@ async fn handle_instruction(
 ) -> Result<()> {
     let (extension, url) = match instruction {
         DownloadInstruction::Image(url) => (extension_for_url(&url), url),
-        DownloadInstruction::Movie(mime, url) => (extension_for_url(&url), url),
+        DownloadInstruction::Movie(mime, url) => (
+            match mime.subtype().as_str().to_lowercase().as_str() {
+                "mp4" => "mp4".to_string(),
+                "avi" => "avi".to_string(),
+                "3gp" => "3gp".to_string(),
+                "mov" => "mov".to_string(),
+                _ => extension_for_url(&url),
+            },
+            url,
+        ),
         DownloadInstruction::ProfileMedia(url) => (extension_for_url(&url), url),
         _ => return Ok(()),
     };
@@ -553,197 +557,5 @@ async fn handle_rate_limit(limit: &RateLimit, call_info: &'static str) {
             limit.remaining,
             limit.limit
         );
-    }
-}
-
-/// Bookmarks require the V2 API, therefore they're a bit awful here
-async fn fetch_bookmarks(
-    storage: Arc<Mutex<Storage>>,
-    config: &Config,
-    sender: &Sender<DownloadInstruction>,
-) -> Result<()> {
-    use twitter_v2::authorization::Oauth1aToken;
-    use twitter_v2::TwitterApi;
-    let Token::Access { consumer, access } = &config.token else {
-        warn!("Invalid token type for Twitter API V2");
-        return Ok(());
-    };
-    // let consumer_key = dotenv!("KEY");
-    // let consumer_secret = dotenv!("SECRET");
-    let auth = Oauth1aToken::new(
-        consumer.key.clone(),
-        consumer.secret.clone(),
-        access.key.clone(),
-        access.secret.clone(),
-    );
-
-    let api = TwitterApi::new(auth);
-    let mut next_token: Option<String> = None;
-
-    let mut bookmarks = Vec::new();
-
-    loop {
-        let response = api
-            .get_user_bookmarks(config.user_id)
-            .max_results(100)
-            .pagination_token(next_token.clone().unwrap_or_default().as_str())
-            .send()
-            .await?;
-        next_token = response.meta().and_then(|e| e.next_token.clone());
-        let Some(data) = response.into_data() else {
-            break;
-        };
-        for tweet in data {
-            let tweet = conversion::convert_tweet(&tweet);
-            if let Err(e) = inspect_tweet(&tweet, storage.clone(), &config, &sender).await {
-                warn!("Could not inspect {e:?}");
-            }
-            bookmarks.push(tweet);
-        }
-    }
-
-    storage.lock().await.data_mut().bookmarks = bookmarks;
-
-    // .meta
-
-    Ok(())
-}
-
-mod conversion {
-    use chrono::{DateTime, NaiveDateTime, Utc};
-    use egg_mode::{
-        entities::UrlEntity,
-        tweet::{Tweet, TweetEntities, TweetSource},
-    };
-    use time::OffsetDateTime;
-    use twitter_v2::data::FullTextEntities;
-
-    pub fn convert_tweet(tweet: &twitter_v2::Tweet) -> egg_mode::tweet::Tweet {
-        Tweet {
-            coordinates: None,
-            created_at: convert_time(tweet.created_at),
-            current_user_retweet: None,
-            display_text_range: None,
-            entities: convert_entities(tweet.entities.as_ref()),
-            extended_entities: None,
-            favorite_count: tweet
-                .organic_metrics
-                .as_ref()
-                .map(|e| e.like_count as i32)
-                .unwrap_or_default(),
-            favorited: None,
-            filter_level: None,
-            id: tweet.id.as_u64(),
-            in_reply_to_user_id: tweet.in_reply_to_user_id.map(|e| e.as_u64()),
-            in_reply_to_screen_name: None,
-            in_reply_to_status_id: None,
-            lang: tweet.lang.clone(),
-            place: None,
-            possibly_sensitive: tweet.possibly_sensitive,
-            quoted_status_id: tweet
-                .referenced_tweets
-                .as_ref()
-                .map(|e| e.first().map(|o| o.id.as_u64()))
-                .flatten(),
-            quoted_status: None,
-            retweet_count: tweet
-                .organic_metrics
-                .as_ref()
-                .map(|e| e.retweet_count as i32)
-                .unwrap_or_default(),
-            retweeted: None,
-            retweeted_status: None,
-            source: tweet.source.as_ref().map(|e| TweetSource {
-                name: e.clone(),
-                url: "".to_owned(),
-            }),
-            text: tweet.text.clone(),
-            truncated: false,
-            user: None,
-            withheld_copyright: false,
-            withheld_in_countries: None,
-            withheld_scope: None,
-        }
-    }
-
-    fn convert_time(time: Option<OffsetDateTime>) -> chrono::DateTime<chrono::Utc> {
-        let Some(time) = time else {
-            return Utc::now();
-        };
-        // Create a NaiveDateTime from the timestamp
-        let naive = NaiveDateTime::from_timestamp_opt(time.unix_timestamp(), 0).unwrap();
-
-        // Create a normal DateTime from the NaiveDateTime
-        let datetime: DateTime<Utc> = DateTime::from_utc(naive, Utc);
-        datetime
-    }
-
-    fn convert_entities(entities: Option<&FullTextEntities>) -> TweetEntities {
-        let Some(entities) = entities else {
-        return TweetEntities {
-            hashtags: Vec::new(),
-            symbols: Vec::new(),
-            urls: Vec::new(),
-            user_mentions: Vec::new(),
-            media: None,
-        }
-        };
-        let urls = entities
-            .urls
-            .clone()
-            .unwrap_or_default()
-            .iter()
-            .map(convert_url_entity)
-            .collect();
-        let hashtags = entities
-            .hashtags
-            .clone()
-            .unwrap_or_default()
-            .iter()
-            .map(convert_hashtag_entity)
-            .collect();
-        let user_mentions = entities
-            .mentions
-            .clone()
-            .unwrap_or_default()
-            .iter()
-            .map(convert_mention_entity)
-            .collect();
-        TweetEntities {
-            hashtags,
-            symbols: Vec::new(),
-            urls,
-            user_mentions,
-            media: None,
-        }
-    }
-
-    fn convert_url_entity(url: &twitter_v2::data::UrlEntity) -> UrlEntity {
-        UrlEntity {
-            display_url: url.display_url.clone(),
-            expanded_url: Some(url.expanded_url.clone()),
-            range: (url.start, url.end),
-            url: url.url.clone(),
-        }
-    }
-
-    fn convert_hashtag_entity(
-        hashtag: &twitter_v2::data::HashtagEntity,
-    ) -> egg_mode::entities::HashtagEntity {
-        egg_mode::entities::HashtagEntity {
-            range: (hashtag.start, hashtag.end),
-            text: hashtag.tag.clone(),
-        }
-    }
-
-    fn convert_mention_entity(
-        mention: &twitter_v2::data::MentionEntity,
-    ) -> egg_mode::entities::MentionEntity {
-        egg_mode::entities::MentionEntity {
-            id: mention.id.map(|m| m.as_u64()).unwrap_or_default(),
-            range: (mention.start, mention.end),
-            name: mention.username.clone(),
-            screen_name: mention.username.clone(),
-        }
     }
 }

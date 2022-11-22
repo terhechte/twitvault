@@ -2,32 +2,54 @@ mod crawler;
 mod helpers;
 mod storage;
 mod types;
+
+use crate::types::Message;
+use tracing::info;
+
 // mod ui;
 
-use std::{path::PathBuf, str::FromStr};
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 use storage::Storage;
 
 use eyre::{bail, Result};
 use tokio::{sync::mpsc, try_join};
 
-fn main() {
+#[tokio::main]
+async fn main() -> Result<()> {
     setup_tracing();
-    helpers::apiv2_helper::login().unwrap();
+    let config = helpers::Config::load().await?;
+
+    let Ok(storage_path) = PathBuf::from_str("archive") else { bail!("Invalid Path") };
+
+    info!("Found User {}", config.screen_name);
+
+    let storage = match Storage::open(&storage_path) {
+        Ok(existing) => existing,
+        Err(e) => {
+            info!("Crawling: Could not open storage: {e:?}.");
+            crawl_into_storage(config.clone(), &storage_path).await?
+        }
+    };
+
+    println!("tweets: {}", storage.data().tweets.len());
+    println!("mentions: {}", storage.data().mentions.len());
+    println!("responses: {}", storage.data().responses.len());
+    println!("profiles: {}", storage.data().profiles.len());
+    println!("followers: {}", storage.data().followers.len());
+    println!("follows: {}", storage.data().follows.len());
+    println!("lists: {}", storage.data().lists.len());
+    println!("media: {}", storage.data().media.len());
+
+    Ok(())
 }
 
-#[tokio::main]
-async fn xmain() -> Result<()> {
-    setup_tracing();
-    info!("Parse Config");
-    let config = helpers::Config::load().await;
-
-    let Ok(storage_path) = PathBuf::from_str("test") else { bail!("Invalid Path") };
-
-    // For now, we always recreate the storage
-    info!("Found User {}", config.screen_name);
+async fn crawl_into_storage(config: helpers::Config, storage_path: &Path) -> Result<Storage> {
     let Ok(user_container) = egg_mode::user::lookup([config.user_id], &config.token).await else { bail!("Could not find user") };
     let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
-    let storage = Storage::new(user.clone(), &storage_path);
+    let storage = Storage::new(user.clone(), storage_path)?;
 
     // crawl
     let (sender, mut receiver) = mpsc::channel(32);
@@ -35,52 +57,41 @@ async fn xmain() -> Result<()> {
         while let Some(message) = receiver.recv().await {
             match message {
                 Message::Finished(m) => {
-                    println!("tweets: {}", m.data().tweets.len());
-                    println!("mentions: {}", m.data().mentions.len());
-                    println!("responses: {}", m.data().responses.len());
-                    println!("profiles: {}", m.data().profiles.len());
-                    println!("followers: {}", m.data().followers.len());
-                    println!("follows: {}", m.data().follows.len());
-                    println!("lists: {}", m.data().lists.len());
-                    println!("media: {}", m.data().media.len());
+                    return Ok(m);
                 }
                 Message::Loading(n) => {
                     info!("Loading {n:?}");
                 }
+                Message::Error(error) => {
+                    return Err(error);
+                }
             }
         }
+        Err(eyre::eyre!("Invalid Loop Brak"))
     });
 
     let crawl_task = tokio::spawn(async move {
-        match crawler::fetch(&config, storage, sender).await {
+        match crawler::fetch(&config, storage, sender.clone()).await {
             Ok(_) => (),
             Err(e) => {
-                println!("Error during crawling: {e:?}");
-                panic!();
+                if let Err(e) = sender.send(Message::Error(e)).await {
+                    println!("Could not close channel for error  {e:?}");
+                }
             }
         }
     });
 
-    try_join!(output_task, crawl_task)?;
+    let (storage, _) = try_join!(output_task, crawl_task)?;
+    let storage = storage?;
 
-    // let storage = if storage_path.exists() {
-    //     Storage::open(&storage_path)?
-    // } else {
-    // };
-
-    Ok(())
+    storage.save()?;
+    Ok(storage)
 }
 
-use tracing::{info, trace};
-use tracing_subscriber::prelude::*;
-use tracing_subscriber::{
-    filter::{EnvFilter, LevelFilter},
-    fmt,
-};
-
-use crate::types::Message;
-
 pub fn setup_tracing() {
+    use tracing_subscriber::prelude::*;
+    use tracing_subscriber::{filter::EnvFilter, fmt};
+
     let env_filter = EnvFilter::new("hyper=info,twittalypse=debug");
 
     let collector = tracing_subscriber::registry()

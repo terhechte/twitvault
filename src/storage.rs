@@ -55,23 +55,30 @@ pub struct Storage {
 }
 
 impl Storage {
+    fn storage_for_data(path: impl AsRef<Path>, data: Data) -> Result<Self> {
+        let root_folder = path.as_ref().to_path_buf();
+        if !root_folder.exists() {
+            std::fs::create_dir(&root_folder)?;
+        }
+        if !root_folder.join(FOLDER_MEDIA).exists() {
+            std::fs::create_dir(&root_folder.join(FOLDER_MEDIA))?;
+        }
+        let data_path = root_folder.join(format!("{}.json", data.profile.id));
+        Ok(Storage {
+            root_folder,
+            data_path,
+            data,
+        })
+    }
+
     pub fn media_path(&self, filename: &str) -> PathBuf {
         self.root_folder.join(FOLDER_MEDIA).join(filename)
     }
 
-    pub fn new(profile: TwitterUser, path: impl AsRef<Path>) -> Self {
-        let root_folder = path.as_ref().to_path_buf();
-        if !root_folder.exists() {
-            std::fs::create_dir(&root_folder).expect("Can't crate media folder");
-        }
-        if !root_folder.join(FOLDER_MEDIA).exists() {
-            std::fs::create_dir(&root_folder.join(FOLDER_MEDIA)).expect("Can't crate media folder");
-        }
-        let data_path = root_folder.join(format!("{}.json", profile.id));
-        Storage {
-            root_folder,
-            data_path,
-            data: Data {
+    pub fn new(profile: TwitterUser, path: impl AsRef<Path>) -> Result<Self> {
+        Self::storage_for_data(
+            path,
+            Data {
                 profile,
                 tweets: Default::default(),
                 mentions: Default::default(),
@@ -83,7 +90,13 @@ impl Storage {
                 lists: Default::default(),
                 media: Default::default(),
             },
-        }
+        )
+    }
+
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        let input = std::fs::read(&path)?;
+        let data: Data = serde_json::from_slice(&input)?;
+        Self::storage_for_data(path, data)
     }
 
     pub fn data(&self) -> &Data {
@@ -93,15 +106,6 @@ impl Storage {
     pub fn data_mut(&mut self) -> &mut Data {
         &mut self.data
     }
-
-    // pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-    //     let input = std::fs::read(&path)?;
-    //     let data: Data = serde_json::from_slice(&input)?;
-    //     Ok(Storage {
-    //         path: path.as_ref().to_path_buf(),
-    //         data,
-    //     })
-    // }
 
     pub fn with_data(&mut self, action: impl Fn(&mut Data)) {
         action(&mut self.data)
