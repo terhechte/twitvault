@@ -8,6 +8,7 @@ use std::{
 
 /// The folder locations for the different data
 const FOLDER_MEDIA: &str = "media";
+const FILE_ROOT: &str = "_data.json";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct List {
@@ -63,7 +64,7 @@ impl Storage {
         if !root_folder.join(FOLDER_MEDIA).exists() {
             std::fs::create_dir(&root_folder.join(FOLDER_MEDIA))?;
         }
-        let data_path = root_folder.join(format!("{}.json", data.profile.id));
+        let data_path = root_folder.join(FILE_ROOT);
         Ok(Storage {
             root_folder,
             data_path,
@@ -94,7 +95,8 @@ impl Storage {
     }
 
     pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let input = std::fs::read(&path)?;
+        let data_path = path.as_ref().join(FILE_ROOT);
+        let input = std::fs::read(&data_path)?;
         let data: Data = serde_json::from_slice(&input)?;
         Self::storage_for_data(path, data)
     }

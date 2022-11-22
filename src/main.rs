@@ -6,7 +6,7 @@ mod types;
 use crate::types::Message;
 use tracing::info;
 
-// mod ui;
+mod ui;
 
 use std::{
     path::{Path, PathBuf},
@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
     setup_tracing();
     let config = helpers::Config::load().await?;
 
-    let Ok(storage_path) = PathBuf::from_str(&format!("archive_{}", config.user_id)) else { bail!("Invalid Path") };
+    let Ok(storage_path) = PathBuf::from_str("archive") else { bail!("Invalid Path") };
 
     info!("Found User {}", config.screen_name);
 
@@ -44,6 +44,10 @@ async fn main() -> Result<()> {
     println!("follows: {}", storage.data().follows.len());
     println!("lists: {}", storage.data().lists.len());
     println!("media: {}", storage.data().media.len());
+
+    // This will re-open the storage
+    std::mem::drop(storage);
+    ui::run_ui();
 
     Ok(())
 }
