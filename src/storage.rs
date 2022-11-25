@@ -38,8 +38,6 @@ pub struct Data {
     pub followers: Vec<UserId>,
     /// Follows
     pub follows: Vec<UserId>,
-    /// Bookmarked posts FIXME: Needs the v2 api, can I re-use the token?
-    pub bookmarks: Vec<Tweet>,
     /// Lists
     pub lists: Vec<List>,
     /// Downloaded media with path to local file
@@ -87,7 +85,6 @@ impl Storage {
                 profiles: Default::default(),
                 followers: Default::default(),
                 follows: Default::default(),
-                bookmarks: Default::default(),
                 lists: Default::default(),
                 media: Default::default(),
             },
@@ -122,8 +119,4 @@ impl Storage {
             .open(&self.data_path)?;
         Ok(serde_json::to_writer(outfile, &self.data)?)
     }
-}
-
-impl Storage {
-    // fn
 }

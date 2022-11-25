@@ -8,6 +8,8 @@ use egg_mode::{
     RateLimit,
 };
 use reqwest::Client;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
 use std::io::Write;
 use std::{collections::HashSet, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::{
@@ -18,7 +20,7 @@ use tracing::{info, trace, warn};
 
 use eyre::Result;
 
-use crate::helpers::Config;
+use crate::config::Config;
 
 /// Internal messaging between the different threads
 #[derive(Debug)]
@@ -45,13 +47,17 @@ pub async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -
         }
     }
 
-    let (instruction_sender, mut instruction_receiver) = channel(128);
+    let (instruction_sender, mut instruction_receiver) = channel(4096);
     let cloned_storage = shared_storage.clone();
+    let download_media = config.crawl_options().media;
     let instruction_task = tokio::spawn(async move {
         let client = Client::new();
         while let Some(instruction) = instruction_receiver.recv().await {
             if matches!(instruction, DownloadInstruction::Done) {
                 break;
+            }
+            if !download_media {
+                continue;
             }
             if let Err(e) = handle_instruction(&client, instruction, cloned_storage.clone()).await {
                 warn!("Download Error {e:?}");
@@ -59,49 +65,59 @@ pub async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -
         }
     });
 
-    msg("User Tweets", &sender).await?;
-    fetch_user_tweets(
-        user_id,
-        shared_storage.clone(),
-        config,
-        instruction_sender.clone(),
-    )
-    .await?;
-    save_data(&shared_storage).await;
+    if config.crawl_options().tweets {
+        msg("User Tweets", &sender).await?;
+        fetch_user_tweets(
+            user_id,
+            shared_storage.clone(),
+            config,
+            instruction_sender.clone(),
+        )
+        .await?;
+        save_data(&shared_storage).await;
+    }
 
-    msg("User Mentions", &sender).await?;
-    fetch_user_mentions(shared_storage.clone(), config, instruction_sender.clone()).await?;
-    save_data(&shared_storage).await;
+    if config.crawl_options().mentions {
+        msg("User Mentions", &sender).await?;
+        fetch_user_mentions(shared_storage.clone(), config, instruction_sender.clone()).await?;
+        save_data(&shared_storage).await;
+    }
 
-    msg("Followers", &sender).await?;
-    fetch_user_followers(
-        user_id,
-        shared_storage.clone(),
-        config,
-        instruction_sender.clone(),
-    )
-    .await?;
-    save_data(&shared_storage).await;
+    if config.crawl_options().followers {
+        msg("Followers", &sender).await?;
+        fetch_user_followers(
+            user_id,
+            shared_storage.clone(),
+            config,
+            instruction_sender.clone(),
+        )
+        .await?;
+        save_data(&shared_storage).await;
+    }
 
-    msg("Follows", &sender).await?;
-    fetch_user_follows(
-        user_id,
-        shared_storage.clone(),
-        config,
-        instruction_sender.clone(),
-    )
-    .await?;
-    save_data(&shared_storage).await;
+    if config.crawl_options().follows {
+        msg("Follows", &sender).await?;
+        fetch_user_follows(
+            user_id,
+            shared_storage.clone(),
+            config,
+            instruction_sender.clone(),
+        )
+        .await?;
+        save_data(&shared_storage).await;
+    }
 
-    msg("Lists", &sender).await?;
-    fetch_lists(
-        user_id,
-        shared_storage.clone(),
-        config,
-        instruction_sender.clone(),
-    )
-    .await?;
-    save_data(&shared_storage).await;
+    if config.crawl_options().lists {
+        msg("Lists", &sender).await?;
+        fetch_lists(
+            user_id,
+            shared_storage.clone(),
+            config,
+            instruction_sender.clone(),
+        )
+        .await?;
+        save_data(&shared_storage).await;
+    }
 
     instruction_sender.send(DownloadInstruction::Done).await?;
     instruction_task.await?;
@@ -120,9 +136,12 @@ async fn fetch_user_tweets(
 ) -> Result<()> {
     let mut timeline = tweet::user_timeline(id, true, true, &config.token).with_page_size(50);
 
+    let mut first_page = config.paging_position("user_tweets");
+
     loop {
         tracing::info!("Downloading Tweets before {:?}", timeline.min_id);
-        let (next_timeline, mut feed) = timeline.older(None).await?;
+        let (next_timeline, mut feed) = timeline.older(first_page).await?;
+        first_page = None;
         if feed.response.is_empty() {
             break;
         }
@@ -138,7 +157,10 @@ async fn fetch_user_tweets(
 
         handle_rate_limit(&feed.rate_limit_status, "User Feed").await;
         timeline = next_timeline;
+        config.set_paging_position("user_tweets", timeline.min_id)
     }
+
+    config.set_paging_position("user_tweets", None);
 
     Ok(())
 }
@@ -150,9 +172,12 @@ async fn fetch_user_mentions(
 ) -> Result<()> {
     let mut timeline = tweet::mentions_timeline(&config.token).with_page_size(50);
 
+    let mut first_page = config.paging_position("user_mentions");
+
     loop {
         tracing::info!("Downloading Mentions before {:?}", timeline.min_id);
-        let (next_timeline, mut feed) = timeline.older(None).await?;
+        let (next_timeline, mut feed) = timeline.older(first_page).await?;
+        first_page = None;
         if feed.response.is_empty() {
             break;
         }
@@ -168,7 +193,10 @@ async fn fetch_user_mentions(
 
         handle_rate_limit(&feed.rate_limit_status, "User Mentions").await;
         timeline = next_timeline;
+        config.set_paging_position("user_mentions", timeline.min_id)
     }
+
+    config.set_paging_position("user_mentions", None);
 
     Ok(())
 }
@@ -219,8 +247,9 @@ async fn fetch_profiles_ids(
     sender: Sender<DownloadInstruction>,
 ) -> Result<Vec<u64>> {
     let mut ids = Vec::new();
+    cursor.next_cursor = config.paging_position(kind).map(|e| e as i64).unwrap_or(-1);
     loop {
-        info!("Downloading {kind} before {}", cursor.previous_cursor);
+        info!("Downloading {kind} before {}", cursor.next_cursor);
         let called = cursor.call();
         let resp = match called.await {
             Ok(n) => n,
@@ -243,7 +272,10 @@ async fn fetch_profiles_ids(
 
         handle_rate_limit(&resp.rate_limit_status, kind).await;
         cursor.next_cursor = resp.response.next_cursor;
+        config.set_paging_position(kind, u64::try_from(cursor.next_cursor).ok());
     }
+
+    config.set_paging_position(kind, None);
 
     Ok(ids)
 }
@@ -288,6 +320,10 @@ async fn fetch_lists(
     sender: Sender<DownloadInstruction>,
 ) -> Result<()> {
     let mut cursor = list::ownerships(id, &config.token).with_page_size(500);
+    cursor.next_cursor = config
+        .paging_position("lists")
+        .map(|e| e as i64)
+        .unwrap_or(-1);
     loop {
         let called = cursor.call();
         let resp = match called.await {
@@ -311,7 +347,10 @@ async fn fetch_lists(
 
         handle_rate_limit(&resp.rate_limit_status, "Lists").await;
         cursor.next_cursor = resp.response.next_cursor;
+        config.set_paging_position("lists", u64::try_from(cursor.next_cursor).ok());
     }
+
+    config.set_paging_position("lists", None);
     Ok(())
 }
 
@@ -323,6 +362,11 @@ async fn fetch_list_members(
 ) -> Result<()> {
     let list_id = ListID::from_id(list.id);
     let mut cursor = list::members(list_id, &config.token).with_page_size(2000);
+    let paging_key = format!("list-{}", list.id);
+    cursor.next_cursor = config
+        .paging_position(&paging_key)
+        .map(|e| e as i64)
+        .unwrap_or(-1);
     let mut member_ids = Vec::new();
     loop {
         let called = cursor.call();
@@ -354,7 +398,10 @@ async fn fetch_list_members(
 
         handle_rate_limit(&resp.rate_limit_status, "List Members").await;
         cursor.next_cursor = resp.response.next_cursor;
+        config.set_paging_position(&paging_key, u64::try_from(cursor.next_cursor).ok());
     }
+
+    config.set_paging_position(&paging_key, None);
 
     shared_storage.lock().await.data_mut().lists.push(List {
         name: list.name.clone(),
@@ -401,33 +448,52 @@ async fn inspect_tweet(
     config: &Config,
     sender: &Sender<DownloadInstruction>,
 ) -> Result<()> {
-    if let Err(e) = inspect_inner_tweet(tweet, sender.clone()).await {
+    if let Err(e) = inspect_inner_tweet(tweet, config, &storage, sender.clone()).await {
         warn!("Inspect Tweet Error {e:?}");
     }
 
     if let Some(quoted_tweet) = &tweet.quoted_status {
-        if let Err(e) = inspect_inner_tweet(quoted_tweet, sender.clone()).await {
+        if let Err(e) = inspect_inner_tweet(quoted_tweet, config, &storage, sender.clone()).await {
             warn!("Inspect Quoted Tweet Error {e:?}");
         }
     }
 
     if let Some(retweet) = &tweet.retweeted_status {
-        if let Err(e) = inspect_inner_tweet(retweet, sender.clone()).await {
+        if let Err(e) = inspect_inner_tweet(retweet, config, &storage, sender.clone()).await {
             warn!("Inspect Retweet Error {e:?}");
         }
     }
 
-    if let Some(user) = &tweet.user {
-        if let Err(e) = fetch_single_profile(user.id, storage.clone(), config, sender.clone()).await
-        {
-            warn!("Could not download profile {e:?}");
+    if config.crawl_options().tweet_responses {
+        // for our own tweets, we search for responses
+        if tweet.user.is_none() || tweet.user.as_ref().map(|e| e.id) == Some(config.user_id()) {
+            if let Err(e) = fetch_tweet_replies(tweet, storage.clone(), config, sender).await {
+                warn!("Could not fetch replies for tweet {}: {e:?}", tweet.id);
+            }
         }
     }
 
     Ok(())
 }
 
-async fn inspect_inner_tweet(tweet: &Tweet, sender: Sender<DownloadInstruction>) -> Result<()> {
+async fn inspect_inner_tweet(
+    tweet: &Tweet,
+    config: &Config,
+    storage: &Arc<Mutex<Storage>>,
+    sender: Sender<DownloadInstruction>,
+) -> Result<()> {
+    if config.crawl_options().tweet_profiles {
+        if let Some(user) = &tweet.user {
+            if user.id != config.user_id() {
+                if let Err(e) =
+                    fetch_single_profile(user.id, storage.clone(), config, sender.clone()).await
+                {
+                    warn!("Could not download profile {e:?}");
+                }
+            }
+        }
+    }
+
     let Some(entities) = &tweet.extended_entities else { return Ok(()) };
 
     for media in &entities.media {
@@ -466,6 +532,41 @@ async fn inspect_inner_tweet(tweet: &Tweet, sender: Sender<DownloadInstruction>)
             }
         }
     }
+    Ok(())
+}
+
+async fn fetch_tweet_replies(
+    tweet: &Tweet,
+    storage: Arc<Mutex<Storage>>,
+    config: &Config,
+    sender: &Sender<DownloadInstruction>,
+) -> Result<()> {
+    let search_results = egg_mode::search::search(format!("to:{}", config.screen_name()))
+        .since_tweet(tweet.id)
+        .count(50)
+        .call(&config.token)
+        .await?;
+    handle_rate_limit(&search_results.rate_limit_status, "Tweet Replies").await;
+
+    let mut replies = Vec::new();
+
+    for related_tweet in search_results.response.statuses.into_iter() {
+        if related_tweet.in_reply_to_status_id == Some(tweet.id) {
+            if let Err(e) =
+                inspect_inner_tweet(&related_tweet, config, &storage, sender.clone()).await
+            {
+                warn!("Could not inspect tweet {}: {e:?}", related_tweet.id);
+            }
+            replies.push(related_tweet);
+        }
+    }
+
+    let mut shared_storage = storage.lock().await;
+    shared_storage
+        .data_mut()
+        .responses
+        .insert(tweet.id, replies);
+
     Ok(())
 }
 
@@ -515,18 +616,24 @@ async fn handle_instruction(
         if storage.data().media.contains_key(&url) {
             return Ok(());
         }
-
-        let file_stem = uuid::Uuid::new_v4().to_string();
-        let file_name = format!("{file_stem}.{extension}");
+        let mut hasher = DefaultHasher::new();
+        hasher.write(url.as_bytes());
+        let file_name = format!("{}.{extension}", hasher.finish());
         storage.media_path(&file_name)
     };
+
     let mut fp = std::fs::File::create(&path)?;
 
-    trace!("Downloading {url} into {}", path.display());
-
-    let bytes = client.get(url).send().await?.bytes().await?;
+    let bytes = client.get(&url).send().await?.bytes().await?;
 
     fp.write_all(&bytes)?;
+
+    shared_storage
+        .lock()
+        .await
+        .data_mut()
+        .media
+        .insert(url, path);
 
     Ok(())
 }

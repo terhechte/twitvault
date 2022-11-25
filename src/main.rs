@@ -1,5 +1,5 @@
+mod config;
 mod crawler;
-mod helpers;
 mod storage;
 mod types;
 
@@ -20,11 +20,11 @@ use tokio::{sync::mpsc, try_join};
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing();
-    let config = helpers::Config::load().await?;
+    let config = config::Config::load().await?;
 
     let Ok(storage_path) = PathBuf::from_str("archive") else { bail!("Invalid Path") };
 
-    info!("Found User {}", config.screen_name);
+    info!("Found User {}", config.screen_name());
 
     let storage = match Storage::open(&storage_path) {
         Ok(existing) => existing,
@@ -43,6 +43,9 @@ async fn main() -> Result<()> {
     println!("followers: {}", storage.data().followers.len());
     println!("follows: {}", storage.data().follows.len());
     println!("lists: {}", storage.data().lists.len());
+    for list in storage.data().lists.iter() {
+        println!(" {} members: {}", list.name, list.members.len());
+    }
     println!("media: {}", storage.data().media.len());
 
     // This will re-open the storage
@@ -52,8 +55,8 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn crawl_into_storage(config: helpers::Config, storage_path: &Path) -> Result<Storage> {
-    let Ok(user_container) = egg_mode::user::lookup([config.user_id], &config.token).await else { bail!("Could not find user") };
+async fn crawl_into_storage(config: config::Config, storage_path: &Path) -> Result<Storage> {
+    let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
     let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
     let storage = Storage::new(user.clone(), storage_path)?;
 
@@ -78,7 +81,9 @@ async fn crawl_into_storage(config: helpers::Config, storage_path: &Path) -> Res
 
     let crawl_task = tokio::spawn(async move {
         match crawler::fetch(&config, storage, sender.clone()).await {
-            Ok(_) => (),
+            Ok(_) => {
+                println!("crawl_task done");
+            }
             Err(e) => {
                 if let Err(e) = sender.send(Message::Error(e)).await {
                     println!("Could not close channel for error  {e:?}");
