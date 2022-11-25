@@ -48,7 +48,7 @@ pub struct Data {
 
 #[derive(Debug, Clone)]
 pub struct Storage {
-    root_folder: PathBuf,
+    pub root_folder: PathBuf,
     data_path: PathBuf,
     data: Data,
 }

@@ -11,14 +11,22 @@ use reqwest::Client;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::io::Write;
-use std::{collections::HashSet, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::sync::{
-    mpsc::{channel, Sender},
-    Mutex,
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    str::FromStr,
+    sync::Arc,
+};
+use tokio::{
+    sync::{
+        mpsc::{channel, Sender},
+        Mutex,
+    },
+    try_join,
 };
 use tracing::{info, trace, warn};
 
-use eyre::Result;
+use eyre::{bail, Result};
 
 use crate::config::Config;
 
@@ -31,7 +39,54 @@ enum DownloadInstruction {
     Done,
 }
 
-pub async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Result<()> {
+pub async fn crawl_new_storage(config: Config, storage_path: &Path) -> Result<Storage> {
+    let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
+    let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
+    let storage = Storage::new(user.clone(), storage_path)?;
+    crawl_into_storage(config, storage).await
+}
+
+pub async fn crawl_into_storage(config: Config, storage: Storage) -> Result<Storage> {
+    // crawl
+    let (sender, mut receiver) = channel(256);
+    let output_task = tokio::spawn(async move {
+        while let Some(message) = receiver.recv().await {
+            match message {
+                Message::Finished(m) => {
+                    return Ok(m);
+                }
+                Message::Loading(n) => {
+                    info!("Loading {n:?}");
+                }
+                Message::Error(error) => {
+                    return Err(error);
+                }
+            }
+        }
+        Err(eyre::eyre!("Invalid Loop Brak"))
+    });
+
+    let crawl_task = tokio::spawn(async move {
+        match fetch(&config, storage, sender.clone()).await {
+            Ok(_) => {
+                println!("crawl_task done");
+            }
+            Err(e) => {
+                if let Err(e) = sender.send(Message::Error(e)).await {
+                    println!("Could not close channel for error  {e:?}");
+                }
+            }
+        }
+    });
+
+    let (storage, _) = try_join!(output_task, crawl_task)?;
+    let storage = storage?;
+
+    storage.save()?;
+    Ok(storage)
+}
+
+async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Result<()> {
     let user_id = storage.data().profile.id;
     let shared_storage = Arc::new(Mutex::new(storage));
 
@@ -138,7 +193,12 @@ async fn fetch_user_tweets(
 
     let mut first_page = config.paging_position("user_tweets");
 
-    loop {
+    let first_id = shared_storage.lock().await.data().tweets.first().cloned();
+    let is_sync = config.is_sync;
+
+    let mut collected = Vec::new();
+
+    'outer: loop {
         tracing::info!("Downloading Tweets before {:?}", timeline.min_id);
         let (next_timeline, mut feed) = timeline.older(first_page).await?;
         first_page = None;
@@ -146,18 +206,24 @@ async fn fetch_user_tweets(
             break;
         }
         for tweet in feed.response.iter() {
+            // In this case, we know the tweet and we stop loading further
+            if is_sync && Some(tweet.id) == first_id.as_ref().map(|e| e.id) {
+                break 'outer;
+            }
             inspect_tweet(tweet, shared_storage.clone(), config, &sender).await?;
         }
-        shared_storage
-            .lock()
-            .await
-            .data_mut()
-            .tweets
-            .append(&mut feed.response);
+        collected.append(&mut feed.response);
 
         handle_rate_limit(&feed.rate_limit_status, "User Feed").await;
         timeline = next_timeline;
         config.set_paging_position("user_tweets", timeline.min_id)
+    }
+
+    let mut s = shared_storage.lock().await;
+    if is_sync {
+        s.data_mut().tweets.splice(0..0, collected);
+    } else {
+        s.data_mut().tweets.append(&mut collected);
     }
 
     config.set_paging_position("user_tweets", None);
@@ -174,7 +240,12 @@ async fn fetch_user_mentions(
 
     let mut first_page = config.paging_position("user_mentions");
 
-    loop {
+    let first_id = shared_storage.lock().await.data().mentions.first().cloned();
+    let is_sync = config.is_sync;
+
+    let mut collected = Vec::new();
+
+    'outer: loop {
         tracing::info!("Downloading Mentions before {:?}", timeline.min_id);
         let (next_timeline, mut feed) = timeline.older(first_page).await?;
         first_page = None;
@@ -182,18 +253,24 @@ async fn fetch_user_mentions(
             break;
         }
         for tweet in feed.response.iter() {
+            // In this case, we know the tweet and we stop loading further
+            if is_sync && Some(tweet.id) == first_id.as_ref().map(|e| e.id) {
+                break 'outer;
+            }
             inspect_tweet(tweet, shared_storage.clone(), config, &sender).await?;
         }
-        shared_storage
-            .lock()
-            .await
-            .data_mut()
-            .mentions
-            .append(&mut feed.response);
+        collected.append(&mut feed.response);
 
         handle_rate_limit(&feed.rate_limit_status, "User Mentions").await;
         timeline = next_timeline;
         config.set_paging_position("user_mentions", timeline.min_id)
+    }
+
+    let mut s = shared_storage.lock().await;
+    if is_sync {
+        s.data_mut().mentions.splice(0..0, collected);
+    } else {
+        s.data_mut().mentions.append(&mut collected);
     }
 
     config.set_paging_position("user_mentions", None);
@@ -207,12 +284,14 @@ async fn fetch_user_followers(
     config: &Config,
     sender: Sender<DownloadInstruction>,
 ) -> Result<()> {
+    let followers = { shared_storage.lock().await.data().followers.clone() };
     let ids = fetch_profiles_ids(
         "followers",
         user::followers_ids(id, &config.token).with_page_size(50),
         shared_storage.clone(),
         config,
         sender,
+        followers,
     )
     .await?;
     shared_storage.lock().await.data_mut().followers = ids;
@@ -225,12 +304,14 @@ async fn fetch_user_follows(
     config: &Config,
     sender: Sender<DownloadInstruction>,
 ) -> Result<()> {
+    let follows = { shared_storage.lock().await.data().follows.clone() };
     let ids = fetch_profiles_ids(
         "follows",
         user::friends_ids(id, &config.token).with_page_size(50),
         shared_storage.clone(),
         config,
         sender,
+        follows,
     )
     .await?;
     shared_storage.lock().await.data_mut().follows = ids;
@@ -245,10 +326,16 @@ async fn fetch_profiles_ids(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    mut ids: Vec<u64>,
 ) -> Result<Vec<u64>> {
-    let mut ids = Vec::new();
     cursor.next_cursor = config.paging_position(kind).map(|e| e as i64).unwrap_or(-1);
+
+    let is_sync = config.is_sync;
+
     loop {
+        if cursor.next_cursor == 0 {
+            break;
+        }
         info!("Downloading {kind} before {}", cursor.next_cursor);
         let called = cursor.call();
         let resp = match called.await {
@@ -259,16 +346,32 @@ async fn fetch_profiles_ids(
             }
         };
 
-        let mut new_ids = resp.response.ids.clone();
+        let new_ids = resp.response.ids.clone();
 
         if new_ids.is_empty() {
             break;
         }
 
-        fetch_multiple_profiles_data(&new_ids, shared_storage.clone(), config, sender.clone())
+        let mut unknown_new: Vec<_> = new_ids
+            .iter()
+            .filter(|s| !ids.contains(s))
+            .copied()
+            .collect();
+        let unknown_new_len = unknown_new.len();
+
+        fetch_multiple_profiles_data(&unknown_new, shared_storage.clone(), config, sender.clone())
             .await?;
 
-        ids.append(&mut new_ids);
+        if is_sync {
+            ids.splice(0..0, unknown_new);
+        } else {
+            ids.append(&mut unknown_new);
+        }
+
+        // if we have less unknown then new, we ran into known data
+        if is_sync && unknown_new_len < new_ids.len() {
+            break;
+        }
 
         handle_rate_limit(&resp.rate_limit_status, kind).await;
         cursor.next_cursor = resp.response.next_cursor;
@@ -360,6 +463,18 @@ async fn fetch_list_members(
     config: &Config,
     sender: Sender<DownloadInstruction>,
 ) -> Result<()> {
+    // Lists are not really synced, they're just not downloaded if they already exists
+    if config.is_sync {
+        let s = shared_storage.lock().await;
+        if s.data().lists.iter().any(|e| e.list.id == list.id) {
+            info!(
+                "Ignoring list {} because it was already downloaded",
+                &list.name
+            );
+            return Ok(());
+        }
+    }
+
     let list_id = ListID::from_id(list.id);
     let mut cursor = list::members(list_id, &config.token).with_page_size(2000);
     let paging_key = format!("list-{}", list.id);

@@ -2,40 +2,80 @@ mod config;
 mod crawler;
 mod storage;
 mod types;
-
-use crate::types::Message;
-use tracing::info;
-
 mod ui;
 
-use std::{
-    path::{Path, PathBuf},
-    str::FromStr,
-};
+use eyre::Result;
+use tracing::info;
+
+use config::Config;
 use storage::Storage;
 
-use eyre::{bail, Result};
-use tokio::{sync::mpsc, try_join};
+use std::path::Path;
 
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing();
     let config = config::Config::load().await?;
 
-    let Ok(storage_path) = PathBuf::from_str("archive") else { bail!("Invalid Path") };
+    let storage_path = config::Config::archive_path();
 
-    info!("Found User {}", config.screen_name());
+    let name = "twittalypse";
 
-    let storage = match Storage::open(&storage_path) {
-        Ok(existing) => existing,
-        Err(e) => {
-            info!("Crawling: Could not open storage: {e:?}.");
-            let storage = crawl_into_storage(config.clone(), &storage_path).await?;
-            println!("Saved data to {}", storage_path.display());
-            storage
-        }
+    let storage = Storage::open(&storage_path);
+    let cmd = match &storage {
+        Ok(existing) => clap::Command::new(name)
+            .bin_name(name)
+            .after_help(format!(
+                "Found an existing storage at {} for {}",
+                existing.root_folder.display(),
+                existing.data().profile.screen_name
+            ))
+            .subcommand_required(true)
+            .subcommand(clap::command!("sync"))
+            .subcommand(clap::command!("inspect"))
+            .subcommand(clap::command!("ui")),
+        Err(_) => clap::Command::new(name)
+            .bin_name(name)
+            .after_help(format!(
+                "Found no existing storage at {}",
+                Config::archive_path().display()
+            ))
+            .subcommand_required(false)
+            .subcommand(clap::command!("crawl"))
+            .subcommand(clap::command!("ui")),
     };
 
+    let matches = cmd.get_matches();
+    match (matches.subcommand(), storage) {
+        (Some(("crawl", _)), _) => action_crawl(&config, &storage_path).await?,
+        (Some(("inspect", _)), Ok(storage)) => action_inspect(&storage).await?,
+        (Some(("ui", _)), Ok(storage)) => action_ui(storage).await?,
+        (Some(("sync", _)), Ok(storage)) => action_sync(&config, storage).await?,
+        _ => unreachable!("clap should ensure we don't get here"),
+    };
+
+    Ok(())
+}
+
+async fn action_crawl(config: &Config, storage_path: &Path) -> Result<()> {
+    info!("Crawling");
+    let storage = crawler::crawl_new_storage(config.clone(), storage_path).await?;
+    storage.save()?;
+    action_inspect(&storage).await?;
+    Ok(())
+}
+
+async fn action_sync(config: &Config, storage: Storage) -> Result<()> {
+    let mut config = config.clone();
+    config.is_sync = true;
+    info!("Crawling");
+    let storage = crawler::crawl_into_storage(config.clone(), storage).await?;
+    storage.save()?;
+    action_inspect(&storage).await?;
+    Ok(())
+}
+
+async fn action_inspect(storage: &Storage) -> Result<()> {
     println!("tweets: {}", storage.data().tweets.len());
     println!("mentions: {}", storage.data().mentions.len());
     println!("responses: {}", storage.data().responses.len());
@@ -47,56 +87,15 @@ async fn main() -> Result<()> {
         println!(" {} members: {}", list.name, list.members.len());
     }
     println!("media: {}", storage.data().media.len());
-
-    // This will re-open the storage
-    std::mem::drop(storage);
-    ui::run_ui();
-
     Ok(())
 }
 
-async fn crawl_into_storage(config: config::Config, storage_path: &Path) -> Result<Storage> {
-    let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
-    let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
-    let storage = Storage::new(user.clone(), storage_path)?;
-
-    // crawl
-    let (sender, mut receiver) = mpsc::channel(32);
-    let output_task = tokio::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            match message {
-                Message::Finished(m) => {
-                    return Ok(m);
-                }
-                Message::Loading(n) => {
-                    info!("Loading {n:?}");
-                }
-                Message::Error(error) => {
-                    return Err(error);
-                }
-            }
-        }
-        Err(eyre::eyre!("Invalid Loop Brak"))
-    });
-
-    let crawl_task = tokio::spawn(async move {
-        match crawler::fetch(&config, storage, sender.clone()).await {
-            Ok(_) => {
-                println!("crawl_task done");
-            }
-            Err(e) => {
-                if let Err(e) = sender.send(Message::Error(e)).await {
-                    println!("Could not close channel for error  {e:?}");
-                }
-            }
-        }
-    });
-
-    let (storage, _) = try_join!(output_task, crawl_task)?;
-    let storage = storage?;
-
-    storage.save()?;
-    Ok(storage)
+async fn action_ui(storage: Storage) -> Result<()> {
+    // FIXME:
+    // This will re-open the storage
+    std::mem::drop(storage);
+    ui::run_ui();
+    Ok(())
 }
 
 pub fn setup_tracing() {

@@ -22,3 +22,4 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"]}
 dioxus = "0.2.4"
 dioxus-desktop = "0.2.3"
 obfstr = "0.4.1"
+clap = { version = "4.0.26", default_features = false, features = ["std", "help", "usage", "cargo"] }

@@ -1,5 +1,7 @@
 use std::{
     collections::HashMap,
+    path::PathBuf,
+    str::FromStr,
     sync::{Arc, Mutex},
 };
 
@@ -7,6 +9,7 @@ use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
+const ARCHIVE_PATH: &str = "xarchive";
 const SETTINGS_FILE: &str = "twitter_settings.json";
 const PAGING_FILE: &str = "paging_positions.json";
 
@@ -14,6 +17,10 @@ type PagingPositions = HashMap<String, u64>;
 
 #[derive(Clone)]
 pub struct Config {
+    /// If this is enabled, it will only check for new data and not continue
+    /// paging for old data. (e.g. only activate this once a full archive)
+    /// has been established
+    pub is_sync: bool,
     pub token: egg_mode::Token,
     config_data: ConfigData,
     /// Remember the paging positions for the different endpoints,
@@ -22,6 +29,10 @@ pub struct Config {
 }
 
 impl Config {
+    pub fn archive_path() -> PathBuf {
+        PathBuf::from_str(ARCHIVE_PATH).unwrap()
+    }
+
     pub fn screen_name(&self) -> &str {
         &self.config_data.username
     }
@@ -143,6 +154,7 @@ impl Config {
                 token,
                 config_data,
                 paging_positions: Arc::new(Mutex::new(paging_positions)),
+                is_sync: false,
             })
         } else {
             bail!("Could not log in")
@@ -183,13 +195,13 @@ pub struct CrawlOptions {
 impl Default for CrawlOptions {
     fn default() -> Self {
         Self {
-            tweets: true,
-            tweet_responses: true,
+            tweets: false,
+            tweet_responses: false,
             tweet_profiles: false,
-            mentions: true,
-            followers: true,
+            mentions: false,
+            followers: false,
             follows: true,
-            lists: true,
+            lists: false,
             media: true,
         }
     }
