@@ -1,6 +1,6 @@
 // ANCHOR: all
 #![allow(non_snake_case)]
-use std::{collections::HashMap, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, ops::Deref, path::PathBuf, rc::Rc};
 
 use dioxus::prelude::*;
 
@@ -8,23 +8,52 @@ use crate::storage::{Data, Storage, UrlString};
 use egg_mode::tweet::Tweet;
 
 #[derive(Clone)]
-enum UiState {
+enum LoadingState {
     Setup(String),
     Loading(Vec<String>),
-    Loaded(Rc<Storage>),
+    Loaded(StorageWrapper),
 }
 
 #[derive(Clone)]
-struct ViewStore {
-    state: UiState,
+struct StorageWrapper(Rc<Storage>);
+
+impl StorageWrapper {
+    fn data(&self) -> &Data {
+        self.0.data()
+    }
 }
 
-impl Default for ViewStore {
+impl PartialEq for StorageWrapper {
+    fn eq(&self, other: &Self) -> bool {
+        false
+    }
+}
+
+impl Eq for StorageWrapper {}
+
+impl Default for LoadingState {
     fn default() -> Self {
         // TEMPORARY
-        let data = Storage::open("archive").unwrap();
-        Self {
-            state: UiState::Loaded(Rc::new(data)),
+        let data = Storage::open("archive_terhechte").unwrap();
+        LoadingState::Loaded(StorageWrapper(Rc::new(data)))
+    }
+}
+
+#[derive(PartialEq, Eq, Clone)]
+pub enum Tab {
+    Tweets,
+    Mentions,
+    Followers,
+    Follows,
+}
+
+impl std::fmt::Display for Tab {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Tab::Tweets => f.write_str("Tweets"),
+            Tab::Mentions => f.write_str("Mentions"),
+            Tab::Followers => f.write_str("Followers"),
+            Tab::Follows => f.write_str("Follows"),
         }
     }
 }
@@ -35,24 +64,23 @@ pub fn run_ui() {
 
 fn App(cx: Scope) -> Element {
     cx.use_hook(|_| {
-        cx.provide_context(ViewStore::default());
+        cx.provide_context(LoadingState::default());
     });
 
-    let data = cx.use_hook(|_| cx.consume_context::<ViewStore>().map(|e| e.state));
+    let data = cx.use_hook(|_| cx.consume_context::<LoadingState>());
 
     let view = match data {
-        Some(UiState::Loading(_)) => cx.render(rsx! {
+        Some(LoadingState::Loading(_)) => cx.render(rsx! {
             LoadingComponent {
 
             }
         }),
-        Some(UiState::Loaded(store)) => cx.render(rsx! {
-            TweetListComponent {
-                data: &store.data().tweets,
-                media: &store.data().media
+        Some(LoadingState::Loaded(store)) => cx.render(rsx! {
+            LoadedComponent {
+                storage: store.clone()
             }
         }),
-        Some(UiState::Setup(url)) => cx.render(rsx! {
+        Some(LoadingState::Setup(url)) => cx.render(rsx! {
             SetupComponent {
                 url: url.clone()
             }
@@ -66,41 +94,7 @@ fn App(cx: Scope) -> Element {
             rel: "stylesheet",
             crossorigin: "anonymous"
         },
-        main {
-            class: "d-flex flex-nowrap",
-            div {
-                class: "d-flex flex-column flex-shrink-0 bg-light",
-                style: "width: 6.5rem",
-                ul {
-                    class: "nav nav-pills nav-flush flex-column mb-auto text-center",
-                    NavElement {
-                        label: "Tweets".to_string(),
-                        selected: true
-                    }
-                    NavElement {
-                        label: "Tweets".to_string(),
-                        selected: false
-                    }
-                }
-            }
-            view
-        }
-    })
-}
-
-#[inline_props]
-fn NavElement(cx: Scope, label: String, selected: bool) -> Element {
-    let mut classes = "nav-link py-3 border-bottom rounded-0".to_string();
-    if *selected {
-        classes.push_str(" active");
-    }
-    rsx!(cx, li {
-        class: "nav-item",
-        a {
-            class: "{classes}",
-            href: "#",
-            "{label}"
-        }
+        view
     })
 }
 
@@ -111,6 +105,59 @@ fn SetupComponent(cx: Scope, url: String) -> Element {
             a {
                 href: "{ url }"
             }
+        }
+    })
+}
+
+#[inline_props]
+fn LoadedComponent(cx: Scope, storage: StorageWrapper) -> Element {
+    let selected = use_state(&cx, || Tab::Tweets);
+
+    let data = match *selected.current() {
+        Tab::Tweets => &storage.data().tweets,
+        Tab::Mentions => &storage.data().mentions,
+        _ => panic!(),
+    };
+
+    cx.render(rsx! {
+        main {
+            class: "d-flex flex-nowrap",
+            div {
+                class: "d-flex flex-column flex-shrink-0 bg-light",
+                style: "width: 6.5rem",
+                ul {
+                    class: "nav nav-pills nav-flush flex-column mb-auto text-center",
+                    NavElement {
+                        label: Tab::Tweets,
+                        selected: selected.clone()
+                    }
+                    NavElement {
+                        label: Tab::Mentions
+                        selected: selected.clone()
+                    }
+                }
+            }
+            TweetListComponent {
+                data: data,
+                media: &storage.data().media
+            }
+        }
+    })
+}
+
+#[inline_props]
+fn NavElement(cx: Scope, label: Tab, selected: UseState<Tab>) -> Element {
+    let mut classes = "nav-link py-3 border-bottom rounded-0".to_string();
+    if *selected.current() == *label {
+        classes.push_str(" active");
+    }
+    rsx!(cx, li {
+        class: "nav-item",
+        a {
+            class: "{classes}",
+            onclick: move |_| selected.set(label.clone()),
+            href: "#",
+            "{label}"
         }
     })
 }
