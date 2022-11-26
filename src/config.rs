@@ -5,11 +5,12 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use egg_mode::KeyPair;
 use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-const ARCHIVE_PATH: &str = "xarchive";
+const ARCHIVE_PATH: &str = "test_responses2";
 const SETTINGS_FILE: &str = "twitter_settings.json";
 const PAGING_FILE: &str = "paging_positions.json";
 
@@ -69,16 +70,7 @@ impl Config {
 }
 
 impl Config {
-    pub async fn load() -> Result<Self> {
-        let a1 = Config::load_inner().await;
-        if let Ok(conf) = a1 {
-            return Ok(conf);
-        }
-
-        Config::load_inner().await
-    }
-
-    async fn load_inner() -> Result<Self> {
+    fn keypair() -> KeyPair {
         let consumer_key = obfstr::obfstr!(include_str!("../API_KEY"))
             .trim()
             .to_string();
@@ -86,11 +78,13 @@ impl Config {
             .trim()
             .to_string();
 
-        let con_token = egg_mode::KeyPair::new(consumer_key, consumer_secret);
+        egg_mode::KeyPair::new(consumer_key, consumer_secret)
+    }
+    pub fn open() -> Result<Self> {
+        let con_token = Self::keypair();
 
-        let (token, config_data, paging_positions) = if let Ok(fp) =
-            std::fs::File::open(SETTINGS_FILE)
-        {
+        let (token, config_data, paging_positions) = {
+            let fp = std::fs::File::open(SETTINGS_FILE)?;
             let config_data: ConfigData = serde_json::from_reader(fp)?;
             let paging_positions: PagingPositions = std::fs::File::open(PAGING_FILE)
                 .map_err(|e| eyre::eyre!("{e:?}"))
@@ -104,17 +98,40 @@ impl Config {
                 access: access_token,
             };
 
-            if let Err(err) = egg_mode::auth::verify_tokens(&token).await {
+            (token, config_data, paging_positions)
+        };
+
+        Ok(Config {
+            token,
+            config_data,
+            paging_positions: Arc::new(Mutex::new(paging_positions)),
+            is_sync: false,
+        })
+    }
+
+    pub async fn load() -> Result<Self> {
+        let a1 = Config::load_inner().await;
+        if let Ok(conf) = a1 {
+            return Ok(conf);
+        }
+
+        Config::load_inner().await
+    }
+
+    async fn load_inner() -> Result<Self> {
+        let (token, config_data, paging_positions) = if let Ok(config) = Self::open() {
+            if let Err(err) = egg_mode::auth::verify_tokens(&config.token).await {
                 println!("We've hit an error using your old tokens: {:?}", err);
                 println!("We'll have to reauthenticate before continuing.");
                 println!("Last Paging Positions");
                 std::fs::remove_file(SETTINGS_FILE).unwrap();
             } else {
-                println!("Logged in as {}", config_data.username);
+                println!("Logged in as {}", config.config_data.username);
             }
-            (token, config_data, paging_positions)
+            (config.token, config.config_data, config.paging_positions)
         } else {
             println!("Request Token");
+            let con_token = Self::keypair();
             let request_token = egg_mode::auth::request_token(&con_token, "oob").await?;
 
             println!("Go to the following URL, sign in, and give me the PIN that comes back:");
@@ -146,14 +163,18 @@ impl Config {
                 }
                 _ => bail!("Invalid State"),
             };
-            (token, config_data, PagingPositions::default())
+            (
+                token,
+                config_data,
+                Arc::new(Mutex::new(PagingPositions::default())),
+            )
         };
 
         if std::path::Path::new(SETTINGS_FILE).exists() {
             Ok(Config {
                 token,
                 config_data,
-                paging_positions: Arc::new(Mutex::new(paging_positions)),
+                paging_positions,
                 is_sync: false,
             })
         } else {
@@ -195,14 +216,14 @@ pub struct CrawlOptions {
 impl Default for CrawlOptions {
     fn default() -> Self {
         Self {
-            tweets: false,
+            tweets: true,
             tweet_responses: false,
             tweet_profiles: false,
             mentions: false,
             followers: false,
-            follows: true,
+            follows: false,
             lists: false,
-            media: true,
+            media: false,
         }
     }
 }

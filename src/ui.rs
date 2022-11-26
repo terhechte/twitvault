@@ -1,16 +1,20 @@
-// ANCHOR: all
 #![allow(non_snake_case)]
 use std::{collections::HashMap, ops::Deref, path::PathBuf, rc::Rc};
 
-use dioxus::fermi::{use_atom_state, AtomState};
+use dioxus::core::to_owned;
+use dioxus::fermi::{use_atom_root, use_atom_state, AtomState};
 use dioxus::prelude::*;
 use egg_mode::account::UserProfile;
 use egg_mode::user::TwitterUser;
-use tracing::info;
+use eyre::Report;
+use futures::StreamExt;
+use tokio::sync::mpsc::channel;
+use tracing::{info, warn};
 
 use crate::config::Config;
 use crate::crawler::DownloadInstruction;
 use crate::storage::{Data, List, Storage, TweetId, UrlString, UserId};
+use crate::types::Message;
 use egg_mode::tweet::Tweet;
 
 #[derive(Clone)]
@@ -18,6 +22,7 @@ enum LoadingState {
     Setup(String),
     Loading(Vec<String>),
     Loaded(StorageWrapper),
+    Error(String),
 }
 
 #[derive(Clone)]
@@ -51,9 +56,11 @@ impl Default for LoadingState {
     fn default() -> Self {
         // TEMPORARY
         //let data = Storage::open("archive_terhechte").unwrap();
-        let s = Config::archive_path();
-        let data = Storage::open(s).unwrap();
-        LoadingState::Loaded(StorageWrapper::new(data))
+
+        // let s = Config::archive_path();
+        // let data = Storage::open(s).unwrap();
+        // LoadingState::Loaded(StorageWrapper::new(data))
+        LoadingState::Setup(String::new())
     }
 }
 
@@ -115,6 +122,11 @@ fn App(cx: Scope) -> Element {
                 url: url.clone()
             }
         }),
+        Some(LoadingState::Error(e)) => cx.render(rsx! {
+            div {
+                "{e}"
+            }
+        }),
         None => todo!(),
     };
 
@@ -130,11 +142,55 @@ fn App(cx: Scope) -> Element {
 
 #[inline_props]
 fn SetupComponent(cx: Scope, url: String) -> Element {
+    let loading_state = use_state(&cx, || Message::Loading(String::new()));
+
+    let crawl = move |config: Config| {
+        let (sender, mut receiver) = channel(256);
+        cx.spawn(async move {
+            let path = Config::archive_path();
+            if let Err(e) = crate::crawler::crawl_new_storage(config, &path, sender).await {
+                warn!("Error {e:?}");
+            }
+        });
+        // cx.spawn(async move {
+        use_future(&cx, (), move |_| {
+            let mut loading_state = loading_state.clone();
+            async move {
+                while let Some(msg) = receiver.recv().await {
+                    let finished = match &msg {
+                        Message::Finished(_) => true,
+                        _ => false,
+                    };
+                    loading_state.set(msg);
+                    if finished {
+                        break;
+                    }
+                }
+            }
+        });
+        // });
+    };
+
+    // FIXME: Setup-config flow
+    let config = Config::open().unwrap();
+
     cx.render(rsx! {
         div {
-            a {
-                href: "{ url }"
+            div {
+                "{loading_state}"
             }
+            button {
+                onclick: move |_| crawl(config.clone())
+            }
+        }
+    })
+}
+
+#[inline_props]
+fn LoadingComponent(cx: Scope) -> Element {
+    cx.render(rsx! {
+        div {
+            h1 { "Loading" }
         }
     })
 }
@@ -320,7 +376,7 @@ fn SecondaryColumn(
     cx.render(rsx! {div {
         class: "d-grid gap-2",
         button {
-            class: "btn-secondary",
+            class: "btn btn-secondary",
             onclick: move |_| selected.set(ColumnState::None),
             "Close"
         }
@@ -348,15 +404,6 @@ fn NavElement(cx: Scope, label: Tab, selected: UseState<Tab>) -> Element {
             onclick: move |_| selected.set(label.clone()),
             href: "#",
             "{label}"
-        }
-    })
-}
-
-#[inline_props]
-fn LoadingComponent(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div {
-            h1 { "Loading" }
         }
     })
 }

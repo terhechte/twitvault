@@ -39,33 +39,22 @@ pub enum DownloadInstruction {
     Done,
 }
 
-pub async fn crawl_new_storage(config: Config, storage_path: &Path) -> Result<Storage> {
+pub async fn crawl_new_storage(
+    config: Config,
+    storage_path: &Path,
+    message_sender: Sender<Message>,
+) -> Result<()> {
     let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
     let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
     let storage = Storage::new(user.clone(), storage_path)?;
-    crawl_into_storage(config, storage).await
+    crawl_into_storage(config, storage, message_sender).await
 }
 
-pub async fn crawl_into_storage(config: Config, storage: Storage) -> Result<Storage> {
-    // crawl
-    let (sender, mut receiver) = channel(256);
-    let output_task = tokio::spawn(async move {
-        while let Some(message) = receiver.recv().await {
-            match message {
-                Message::Finished(m) => {
-                    return Ok(m);
-                }
-                Message::Loading(n) => {
-                    info!("Loading {n:?}");
-                }
-                Message::Error(error) => {
-                    return Err(error);
-                }
-            }
-        }
-        Err(eyre::eyre!("Invalid Loop Brak"))
-    });
-
+pub async fn crawl_into_storage(
+    config: Config,
+    storage: Storage,
+    sender: Sender<Message>,
+) -> Result<()> {
     let crawl_task = tokio::spawn(async move {
         match fetch(&config, storage, sender.clone()).await {
             Ok(_) => {
@@ -79,11 +68,9 @@ pub async fn crawl_into_storage(config: Config, storage: Storage) -> Result<Stor
         }
     });
 
-    let (storage, _) = try_join!(output_task, crawl_task)?;
-    let storage = storage?;
+    crawl_task.await;
 
-    storage.save()?;
-    Ok(storage)
+    Ok(())
 }
 
 async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Result<()> {
@@ -222,7 +209,10 @@ async fn fetch_user_tweets(
 
         handle_rate_limit(&feed.rate_limit_status, "User Feed").await;
         timeline = next_timeline;
-        config.set_paging_position("user_tweets", timeline.min_id)
+        config.set_paging_position("user_tweets", timeline.min_id);
+        if collected.len() > 200 {
+            break;
+        }
     }
 
     let mut s = shared_storage.lock().await;
@@ -636,7 +626,7 @@ async fn fetch_tweet_replies(
 ) -> Result<()> {
     let search_results = egg_mode::search::search(format!("to:{}", config.screen_name()))
         .since_tweet(tweet.id)
-        .count(50)
+        .count(100)
         .call(&config.token)
         .await?;
     handle_rate_limit(&search_results.rate_limit_status, "Tweet Replies").await;
@@ -652,6 +642,10 @@ async fn fetch_tweet_replies(
             }
             replies.push(related_tweet);
         }
+    }
+
+    if replies.is_empty() {
+        return Ok(());
     }
 
     let mut shared_storage = storage.lock().await;

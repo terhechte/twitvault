@@ -6,12 +6,18 @@ mod types;
 mod ui;
 
 use eyre::Result;
+use tokio::{
+    sync::mpsc::{channel, Receiver},
+    task::JoinHandle,
+};
 use tracing::info;
 
 use config::Config;
 use storage::Storage;
 
 use std::path::Path;
+
+use crate::types::Message;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -22,6 +28,7 @@ async fn main() -> Result<()> {
 
     let name = "twittalypse";
 
+    println!("Storage: {}", storage_path.display());
     let storage = Storage::open(&storage_path);
     let cmd = match &storage {
         Ok(existing) => clap::Command::new(name)
@@ -50,7 +57,8 @@ async fn main() -> Result<()> {
     match (matches.subcommand(), storage) {
         (Some(("crawl", _)), _) => action_crawl(&config, &storage_path).await?,
         (Some(("inspect", _)), Ok(storage)) => action_inspect(&storage).await?,
-        (Some(("ui", _)), Ok(storage)) => action_ui(storage).await?,
+        (Some(("ui", _)), Ok(storage)) => action_ui(Some(storage)).await?,
+        (Some(("ui", _)), Err(_)) => action_ui(None).await?,
         (Some(("sync", _)), Ok(storage)) => action_sync(&config, storage).await?,
         _ => unreachable!("clap should ensure we don't get here"),
     };
@@ -60,8 +68,11 @@ async fn main() -> Result<()> {
 
 async fn action_crawl(config: &Config, storage_path: &Path) -> Result<()> {
     info!("Crawling");
-    let storage = crawler::crawl_new_storage(config.clone(), storage_path).await?;
-    storage.save()?;
+    let (sender, receiver) = channel(256);
+
+    crawler::crawl_new_storage(config.clone(), storage_path, sender).await?;
+    let storage = log_task(receiver).await??;
+    storage.save();
     action_inspect(&storage).await?;
     Ok(())
 }
@@ -70,10 +81,31 @@ async fn action_sync(config: &Config, storage: Storage) -> Result<()> {
     let mut config = config.clone();
     config.is_sync = true;
     info!("Crawling");
-    let storage = crawler::crawl_into_storage(config.clone(), storage).await?;
+    let (sender, receiver) = channel(256);
+    crawler::crawl_into_storage(config.clone(), storage, sender).await?;
+    let storage = log_task(receiver).await??;
     storage.save()?;
     action_inspect(&storage).await?;
     Ok(())
+}
+
+fn log_task(mut receiver: Receiver<Message>) -> JoinHandle<Result<Storage>> {
+    tokio::spawn(async move {
+        while let Some(message) = receiver.recv().await {
+            match message {
+                Message::Finished(m) => {
+                    return Ok(m);
+                }
+                Message::Loading(n) => {
+                    info!("Loading {n:?}");
+                }
+                Message::Error(error) => {
+                    return Err(error);
+                }
+            }
+        }
+        Err(eyre::eyre!("Invalid Loop Break"))
+    })
 }
 
 async fn action_inspect(storage: &Storage) -> Result<()> {
@@ -91,11 +123,11 @@ async fn action_inspect(storage: &Storage) -> Result<()> {
     Ok(())
 }
 
-async fn action_ui(storage: Storage) -> Result<()> {
-    action_inspect(&storage).await?;
+async fn action_ui(storage: Option<Storage>) -> Result<()> {
+    // action_inspect(&storage).await?;
     // FIXME:
     // This will re-open the storage
-    std::mem::drop(storage);
+    // std::mem::drop(storage);
     ui::run_ui();
     Ok(())
 }
