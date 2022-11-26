@@ -1,5 +1,6 @@
 mod config;
 mod crawler;
+mod helpers;
 mod storage;
 mod types;
 mod ui;
@@ -91,6 +92,7 @@ async fn action_inspect(storage: &Storage) -> Result<()> {
 }
 
 async fn action_ui(storage: Storage) -> Result<()> {
+    action_inspect(&storage).await?;
     // FIXME:
     // This will re-open the storage
     std::mem::drop(storage);
