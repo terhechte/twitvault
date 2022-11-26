@@ -32,7 +32,7 @@ use crate::config::Config;
 
 /// Internal messaging between the different threads
 #[derive(Debug)]
-enum DownloadInstruction {
+pub enum DownloadInstruction {
     Image(String),
     Movie(mime::Mime, String),
     ProfileMedia(String),
@@ -119,6 +119,12 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
             }
         }
     });
+
+    inspect_profile(
+        &shared_storage.lock().await.data().profile,
+        instruction_sender.clone(),
+    )
+    .await?;
 
     if config.crawl_options().tweets {
         msg("User Tweets", &sender).await?;
@@ -609,44 +615,16 @@ async fn inspect_inner_tweet(
         }
     }
 
-    let Some(entities) = &tweet.extended_entities else { return Ok(()) };
+    let Some(media) = crate::helpers::media_in_tweet(tweet) else {
+        return Ok(())
+    };
 
-    for media in &entities.media {
-        match &media.video_info {
-            Some(n) => {
-                let mut selected_variant = n.variants.first();
-                for variant in &n.variants {
-                    match (
-                        variant.content_type.subtype(),
-                        &selected_variant.map(|e| e.bitrate),
-                    ) {
-                        (mime::MP4, Some(bitrate)) if bitrate > &variant.bitrate => {
-                            selected_variant = Some(variant)
-                        }
-                        _ => (),
-                    }
-                }
-                let Some(variant) = selected_variant else { continue };
-                if let Err(e) = sender
-                    .send(DownloadInstruction::Movie(
-                        variant.content_type.clone(),
-                        variant.url.clone(),
-                    ))
-                    .await
-                {
-                    warn!("Send Error {e:?}");
-                }
-            }
-            None => {
-                if let Err(e) = sender
-                    .send(DownloadInstruction::Image(media.media_url_https.clone()))
-                    .await
-                {
-                    warn!("Send Error {e:?}");
-                }
-            }
+    for entry in media {
+        if let Err(e) = sender.send(entry).await {
+            warn!("Send Error {e:?}");
         }
     }
+
     Ok(())
 }
 
