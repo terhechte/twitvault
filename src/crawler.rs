@@ -11,19 +11,15 @@ use reqwest::Client;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::io::Write;
-use std::rc::Rc;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
     str::FromStr,
     sync::Arc,
 };
-use tokio::{
-    sync::{
-        mpsc::{channel, Sender},
-        Mutex,
-    },
-    try_join,
+use tokio::sync::{
+    mpsc::{channel, Sender},
+    Mutex,
 };
 use tracing::{info, trace, warn};
 

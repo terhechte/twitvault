@@ -1,3 +1,4 @@
+#![allow(unused)]
 mod config;
 mod crawler;
 mod helpers;
@@ -25,8 +26,6 @@ async fn main() -> Result<()> {
     // let config = config::Config::load().await?;
 
     // let storage_path = config::Config::archive_path();
-
-    let name = "twittalypse";
 
     ui::run_ui();
 
