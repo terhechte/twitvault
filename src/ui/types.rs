@@ -1,18 +1,10 @@
 #![allow(non_snake_case)]
-use std::{collections::HashMap, path::PathBuf, rc::Rc};
+use std::rc::Rc;
 
-use dioxus::desktop::tao::window::WindowBuilder;
-use dioxus::events::*;
-use dioxus::fermi::{use_atom_state, AtomState};
-use dioxus::prelude::*;
-use egg_mode::user::TwitterUser;
-use tokio::sync::mpsc::channel;
-use tracing::warn;
+use crate::config::Config;
 
-use crate::config::{Config, RequestData};
-use crate::crawler::DownloadInstruction;
-use crate::storage::{Data, Storage, TweetId, UrlString, UserId};
-use crate::types::Message;
+use crate::storage::{Data, Storage};
+
 use egg_mode::tweet::Tweet;
 
 #[derive(Clone)]
@@ -33,6 +25,8 @@ impl PartialEq for LoadingState {
         }
     }
 }
+
+impl Eq for LoadingState {}
 
 #[derive(Clone)]
 pub struct StorageWrapper {

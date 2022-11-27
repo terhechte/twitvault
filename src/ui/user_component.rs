@@ -1,19 +1,11 @@
 #![allow(non_snake_case)]
-use std::{collections::HashMap, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, path::PathBuf};
 
-use dioxus::desktop::tao::window::WindowBuilder;
-use dioxus::events::*;
-use dioxus::fermi::{use_atom_state, AtomState};
+use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
-use tokio::sync::mpsc::channel;
-use tracing::warn;
 
-use crate::config::{Config, RequestData};
-use crate::crawler::DownloadInstruction;
-use crate::storage::{Data, Storage, TweetId, UrlString, UserId};
-use crate::types::Message;
-use egg_mode::tweet::Tweet;
+use crate::storage::UrlString;
 
 use super::loaded_component::{ColumnState, COLUMN2};
 use super::tweet_component::TweetComponent;
