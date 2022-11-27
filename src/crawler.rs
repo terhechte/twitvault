@@ -69,20 +69,23 @@ pub async fn crawl_into_storage(
         }
     });
 
-    crawl_task.await;
+    crawl_task.await?;
 
     Ok(())
+}
+
+async fn msg(msg: impl AsRef<str>, sender: &Sender<Message>) {
+    if let Err(e) = sender
+        .send(Message::Loading(msg.as_ref().to_string()))
+        .await
+    {
+        warn!("Could not send message: {}: {e:?}", msg.as_ref());
+    }
 }
 
 async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Result<()> {
     let user_id = storage.data().profile.id;
     let shared_storage = Arc::new(Mutex::new(storage));
-
-    async fn msg(msg: impl AsRef<str>, sender: &Sender<Message>) -> Result<()> {
-        Ok(sender
-            .send(Message::Loading(msg.as_ref().to_string()))
-            .await?)
-    }
 
     async fn save_data(storage: &Arc<Mutex<Storage>>) {
         if let Err(e) = storage.lock().await.save() {
@@ -115,54 +118,59 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
     .await?;
 
     if config.crawl_options().tweets {
-        msg("User Tweets", &sender).await?;
         fetch_user_tweets(
             user_id,
             shared_storage.clone(),
             config,
             instruction_sender.clone(),
+            sender.clone(),
         )
         .await?;
         save_data(&shared_storage).await;
     }
 
     if config.crawl_options().mentions {
-        msg("User Mentions", &sender).await?;
-        fetch_user_mentions(shared_storage.clone(), config, instruction_sender.clone()).await?;
+        fetch_user_mentions(
+            shared_storage.clone(),
+            config,
+            instruction_sender.clone(),
+            sender.clone(),
+        )
+        .await?;
         save_data(&shared_storage).await;
     }
 
     if config.crawl_options().followers {
-        msg("Followers", &sender).await?;
         fetch_user_followers(
             user_id,
             shared_storage.clone(),
             config,
             instruction_sender.clone(),
+            sender.clone(),
         )
         .await?;
         save_data(&shared_storage).await;
     }
 
     if config.crawl_options().follows {
-        msg("Follows", &sender).await?;
         fetch_user_follows(
             user_id,
             shared_storage.clone(),
             config,
             instruction_sender.clone(),
+            sender.clone(),
         )
         .await?;
         save_data(&shared_storage).await;
     }
 
     if config.crawl_options().lists {
-        msg("Lists", &sender).await?;
         fetch_lists(
             user_id,
             shared_storage.clone(),
             config,
             instruction_sender.clone(),
+            sender.clone(),
         )
         .await?;
         save_data(&shared_storage).await;
@@ -182,7 +190,10 @@ async fn fetch_user_tweets(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
 ) -> Result<()> {
+    let label = "User Tweets";
+    msg(label, &message_sender).await;
     let mut timeline = tweet::user_timeline(id, true, true, &config.token).with_page_size(50);
 
     let mut first_page = config.paging_position("user_tweets");
@@ -211,6 +222,10 @@ async fn fetch_user_tweets(
         handle_rate_limit(&feed.rate_limit_status, "User Feed").await;
         timeline = next_timeline;
         config.set_paging_position("user_tweets", timeline.min_id);
+
+        msg(format!("{label}: {}", collected.len()), &message_sender).await;
+
+        // If we get less than we have, stop it
         if collected.len() > 200 {
             break;
         }
@@ -232,7 +247,10 @@ async fn fetch_user_mentions(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
 ) -> Result<()> {
+    let label = "User Mentions";
+    msg(label, &message_sender).await;
     let mut timeline = tweet::mentions_timeline(&config.token).with_page_size(50);
 
     let mut first_page = config.paging_position("user_mentions");
@@ -260,7 +278,9 @@ async fn fetch_user_mentions(
 
         handle_rate_limit(&feed.rate_limit_status, "User Mentions").await;
         timeline = next_timeline;
-        config.set_paging_position("user_mentions", timeline.min_id)
+        config.set_paging_position("user_mentions", timeline.min_id);
+
+        msg(format!("{label}: {}", collected.len()), &message_sender).await;
     }
 
     let mut s = shared_storage.lock().await;
@@ -280,6 +300,7 @@ async fn fetch_user_followers(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
 ) -> Result<()> {
     let followers = { shared_storage.lock().await.data().followers.clone() };
     let ids = fetch_profiles_ids(
@@ -289,6 +310,7 @@ async fn fetch_user_followers(
         config,
         sender,
         followers,
+        message_sender.clone(),
     )
     .await?;
     shared_storage.lock().await.data_mut().followers = ids;
@@ -300,6 +322,7 @@ async fn fetch_user_follows(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
 ) -> Result<()> {
     let follows = { shared_storage.lock().await.data().follows.clone() };
     let ids = fetch_profiles_ids(
@@ -309,6 +332,7 @@ async fn fetch_user_follows(
         config,
         sender,
         follows,
+        message_sender.clone(),
     )
     .await?;
     shared_storage.lock().await.data_mut().follows = ids;
@@ -324,7 +348,9 @@ async fn fetch_profiles_ids(
     config: &Config,
     sender: Sender<DownloadInstruction>,
     mut ids: Vec<u64>,
+    message_sender: Sender<Message>,
 ) -> Result<Vec<u64>> {
+    msg(kind, &message_sender).await;
     cursor.next_cursor = config.paging_position(kind).map(|e| e as i64).unwrap_or(-1);
 
     let is_sync = config.is_sync;
@@ -364,6 +390,8 @@ async fn fetch_profiles_ids(
         } else {
             ids.append(&mut unknown_new);
         }
+
+        msg(format!("{kind}: {}", ids.len()), &message_sender).await;
 
         // if we have less unknown then new, we ran into known data
         if is_sync && unknown_new_len < new_ids.len() {
@@ -418,7 +446,10 @@ async fn fetch_lists(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
 ) -> Result<()> {
+    let label = "Lists";
+    msg(label, &message_sender).await;
     let mut cursor = list::ownerships(id, &config.token).with_page_size(500);
     cursor.next_cursor = config
         .paging_position("lists")
@@ -442,6 +473,11 @@ async fn fetch_lists(
 
         for list in lists {
             info!("Fetching members for list {}", list.full_name);
+            msg(
+                format!("Processing List: {}", list.full_name),
+                &message_sender,
+            )
+            .await;
             fetch_list_members(list, shared_storage.clone(), config, sender.clone()).await?;
         }
 
