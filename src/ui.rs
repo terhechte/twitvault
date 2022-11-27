@@ -1,22 +1,17 @@
 #![allow(non_snake_case)]
-use std::{collections::HashMap, ops::Deref, path::PathBuf, rc::Rc};
+use std::{collections::HashMap, path::PathBuf, rc::Rc};
 
-use dioxus::core::to_owned;
 use dioxus::desktop::tao::window::WindowBuilder;
 use dioxus::events::*;
-use dioxus::fermi::{use_atom_root, use_atom_state, AtomState};
+use dioxus::fermi::{use_atom_state, AtomState};
 use dioxus::prelude::*;
-//use dioxus::desktop::wry::application::
-use egg_mode::account::UserProfile;
 use egg_mode::user::TwitterUser;
-use eyre::Report;
-use futures::StreamExt;
 use tokio::sync::mpsc::channel;
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::config::{Config, RequestData};
 use crate::crawler::DownloadInstruction;
-use crate::storage::{Data, List, Storage, TweetId, UrlString, UserId};
+use crate::storage::{Data, Storage, TweetId, UrlString, UserId};
 use crate::types::Message;
 use egg_mode::tweet::Tweet;
 
@@ -26,7 +21,6 @@ enum LoadingState {
     Setup(Config),
     Loading(Config),
     Loaded(StorageWrapper),
-    Error(String),
 }
 
 impl PartialEq for LoadingState {
@@ -35,7 +29,6 @@ impl PartialEq for LoadingState {
             (Self::Setup(_), Self::Setup(_)) => true,
             (Self::Loading(_), Self::Loading(_)) => true,
             (Self::Loaded(_), Self::Loaded(_)) => true,
-            (Self::Error(l0), Self::Error(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -135,12 +128,6 @@ fn default_menu(builder: WindowBuilder) -> WindowBuilder {
 
 fn App(cx: Scope) -> Element {
     let loading_state = use_state(&cx, LoadingState::default);
-    // cx.use_hook(|_| {
-    //     cx.provide_context(LoadingState::default());
-    // });
-
-    // let data = cx.use_hook(|_| cx.consume_context::<LoadingState>());
-
     let view = match loading_state.get() {
         LoadingState::Login => cx.render(rsx! {
             LoginComponent {
@@ -162,11 +149,6 @@ fn App(cx: Scope) -> Element {
         LoadingState::Loaded(store) => cx.render(rsx! {
             LoadedComponent {
                 storage: store.clone()
-            }
-        }),
-        LoadingState::Error(e) => cx.render(rsx! {
-            div {
-                "{e}"
             }
         }),
     };
@@ -193,7 +175,6 @@ enum LoginStateResult {
     RequestData(RequestData),
     LoggedIn(Config),
     Error(String),
-    Waiting,
 }
 
 impl PartialEq for LoginState {
@@ -310,46 +291,6 @@ fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Element {
         }),
     };
 
-    // let request_data = use_future(&cx, (), |_| async move { RequestData::request().await });
-    // let verify_pin = use_future(&cx, (), |)
-
-    // let element = match request_data.value() {
-    //     Some(Ok(data)) => rsx!(div {
-    //         a {
-    //             class: "btn btn-primary",
-    //             href: "{data.authorize_url}",
-    //             onclick: move |_| {
-    //                 // FIXME:
-    //                 // login_state.set(LoginState::TokenUrl(data.clone()));
-    //             },
-    //             "Click here to Log in"
-    //         }
-    //     }),
-    //     Some(Err(e)) => rsx!(div {
-    //         h5 { "Something went wrong" }
-    //         div {
-    //             class: "text-bg-danger p-3",
-    //             "{e}"
-    //         }
-    //     }),
-    //     None => rsx!(div {
-    //         class: "spinner-border"
-    //     }),
-    // };
-
-    // let pin_block = match *(login_state.current()) {
-    //     LoginState::EnteringPin(_) => rsx!(div {
-    //         h5 { "Please enter Pin"}
-    //         form {
-    //             onsubmit: onsubmit,
-    //             prevent_default: "onsubmit",
-
-    //             input { "type": "text", id: "pin", name: "pin" }
-    //         }
-    //     }),
-    //     _ => rsx!(div {}),
-    // };
-
     cx.render(rsx! { div {
         ui
     }})
@@ -434,7 +375,7 @@ fn LoadingComponent(cx: Scope, config: Config, loading_state: UseState<LoadingSt
 
 #[inline_props]
 fn LoadedComponent(cx: Scope, storage: StorageWrapper) -> Element {
-    let selected = use_state(&cx, || Tab::Tweets); //use_atom_state(&cx, COLUMN1);
+    let selected = use_state(&cx, || Tab::Tweets);
 
     let column2 = use_atom_state(&cx, COLUMN2);
     let is_column2 = column2.current().as_ref() != &ColumnState::None;
@@ -745,7 +686,6 @@ fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
             rsx!(AuthorImageComponent {
                 profile: user,
                 media: cx.props.media
-                user: cx.props.user
             })
         })
         .unwrap_or_else(|| rsx!(div {}));
@@ -901,7 +841,6 @@ fn formatted_tweet(tweet: &Tweet) -> String {
 struct AuthorImageProps<'a> {
     profile: &'a TwitterUser,
     media: &'a HashMap<UrlString, PathBuf>,
-    user: &'a TwitterUser,
 }
 
 fn AuthorImageComponent<'a>(cx: Scope<'a, AuthorImageProps>) -> Element<'a> {
@@ -1046,7 +985,6 @@ fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
                 AuthorImageComponent {
                     profile: author,
                     media: cx.props.media
-                    user: author
                 }
             }
             div {
