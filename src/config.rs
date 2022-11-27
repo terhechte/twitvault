@@ -16,7 +16,7 @@ const PAGING_FILE: &str = "paging_positions.json";
 
 type PagingPositions = HashMap<String, u64>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// If this is enabled, it will only check for new data and not continue
     /// paging for old data. (e.g. only activate this once a full archive)
@@ -27,6 +27,12 @@ pub struct Config {
     /// Remember the paging positions for the different endpoints,
     /// so that restarting the crawler will continue where it left off.
     paging_positions: Arc<Mutex<PagingPositions>>,
+}
+
+impl PartialEq for Config {
+    fn eq(&self, other: &Self) -> bool {
+        self.is_sync == other.is_sync && self.config_data == other.config_data
+    }
 }
 
 impl Config {
@@ -109,6 +115,12 @@ impl Config {
         })
     }
 
+    pub async fn verify(&self) -> Result<()> {
+        Ok(egg_mode::auth::verify_tokens(&self.token)
+            .await
+            .map(|_| ())?)
+    }
+
     pub async fn load() -> Result<Self> {
         let a1 = Config::load_inner().await;
         if let Ok(conf) = a1 {
@@ -119,71 +131,86 @@ impl Config {
     }
 
     async fn load_inner() -> Result<Self> {
-        let (token, config_data, paging_positions) = if let Ok(config) = Self::open() {
-            if let Err(err) = egg_mode::auth::verify_tokens(&config.token).await {
+        if let Ok(config) = Self::open() {
+            if let Err(err) = config.verify().await {
                 println!("We've hit an error using your old tokens: {:?}", err);
                 println!("We'll have to reauthenticate before continuing.");
                 println!("Last Paging Positions");
                 std::fs::remove_file(SETTINGS_FILE).unwrap();
+                bail!("Please Relogin")
             } else {
                 println!("Logged in as {}", config.config_data.username);
             }
-            (config.token, config.config_data, config.paging_positions)
+            Ok(config)
         } else {
             println!("Request Token");
-            let con_token = Self::keypair();
-            let request_token = egg_mode::auth::request_token(&con_token, "oob").await?;
+            let request_data = RequestData::request().await?;
 
             println!("Go to the following URL, sign in, and give me the PIN that comes back:");
-            println!("{}", egg_mode::auth::authorize_url(&request_token));
+            println!("{}", request_data.authorize_url);
 
             let mut pin = String::new();
             std::io::stdin().read_line(&mut pin).unwrap();
             println!();
 
-            let tok_result = egg_mode::auth::access_token(con_token, &request_token, pin).await?;
-
-            let token = tok_result.0;
-
-            let config_data = match token {
-                egg_mode::Token::Access {
-                    access: ref access_token,
-                    ..
-                } => {
-                    let config_data = ConfigData {
-                        username: tok_result.2,
-                        user_id: tok_result.1,
-                        key: access_token.key.to_string(),
-                        secret: access_token.secret.to_string(),
-                        crawl_options: Default::default(),
-                    };
-                    config_data.write()?;
-                    println!("Saved settings to {}", SETTINGS_FILE);
-                    config_data
-                }
-                _ => bail!("Invalid State"),
-            };
-            (
-                token,
-                config_data,
-                Arc::new(Mutex::new(PagingPositions::default())),
-            )
-        };
-
-        if std::path::Path::new(SETTINGS_FILE).exists() {
-            Ok(Config {
-                token,
-                config_data,
-                paging_positions,
-                is_sync: false,
-            })
-        } else {
-            bail!("Could not log in")
+            let config = request_data.validate(&pin).await?;
+            config.config_data.write()?;
+            Ok(config)
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Clone)]
+pub struct RequestData {
+    request_token: KeyPair,
+    pub authorize_url: String,
+    user_pin: String,
+}
+
+impl RequestData {
+    pub async fn request() -> Result<Self> {
+        let con_token = Config::keypair();
+        let request_token = egg_mode::auth::request_token(&con_token, "oob").await?;
+        let authorize_url = egg_mode::auth::authorize_url(&request_token);
+
+        Ok(Self {
+            request_token,
+            authorize_url,
+            user_pin: String::new(),
+        })
+    }
+
+    pub async fn validate(&self, pin: &str) -> Result<Config> {
+        let con_token = Config::keypair();
+        let (token, user_id, username) =
+            egg_mode::auth::access_token(con_token, &self.request_token, pin).await?;
+
+        let config_data = match token {
+            egg_mode::Token::Access {
+                access: ref access_token,
+                ..
+            } => ConfigData {
+                username,
+                user_id,
+                key: access_token.key.to_string(),
+                secret: access_token.secret.to_string(),
+                crawl_options: Default::default(),
+            },
+            _ => bail!("Invalid Token Type {token:?}"),
+        };
+
+        config_data.write()?;
+
+        Ok(Config {
+            token,
+            config_data,
+            paging_positions: Default::default(),
+            is_sync: false,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 struct ConfigData {
     username: String,
     user_id: u64,
@@ -193,7 +220,7 @@ struct ConfigData {
     crawl_options: CrawlOptions,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CrawlOptions {
     /// Download all tweets
     pub tweets: bool,

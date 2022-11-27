@@ -11,6 +11,7 @@ use reqwest::Client;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::io::Write;
+use std::rc::Rc;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},

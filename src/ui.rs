@@ -2,8 +2,11 @@
 use std::{collections::HashMap, ops::Deref, path::PathBuf, rc::Rc};
 
 use dioxus::core::to_owned;
+use dioxus::desktop::tao::window::WindowBuilder;
+use dioxus::events::*;
 use dioxus::fermi::{use_atom_root, use_atom_state, AtomState};
 use dioxus::prelude::*;
+//use dioxus::desktop::wry::application::
 use egg_mode::account::UserProfile;
 use egg_mode::user::TwitterUser;
 use eyre::Report;
@@ -11,7 +14,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc::channel;
 use tracing::{info, warn};
 
-use crate::config::Config;
+use crate::config::{Config, RequestData};
 use crate::crawler::DownloadInstruction;
 use crate::storage::{Data, List, Storage, TweetId, UrlString, UserId};
 use crate::types::Message;
@@ -19,10 +22,23 @@ use egg_mode::tweet::Tweet;
 
 #[derive(Clone)]
 enum LoadingState {
-    Setup(String),
-    Loading(Vec<String>),
+    Login,
+    Setup(Config),
+    Loading(Config),
     Loaded(StorageWrapper),
     Error(String),
+}
+
+impl PartialEq for LoadingState {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Setup(_), Self::Setup(_)) => true,
+            (Self::Loading(_), Self::Loading(_)) => true,
+            (Self::Loaded(_), Self::Loaded(_)) => true,
+            (Self::Error(l0), Self::Error(r0)) => l0 == r0,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -60,7 +76,7 @@ impl Default for LoadingState {
         // let s = Config::archive_path();
         // let data = Storage::open(s).unwrap();
         // LoadingState::Loaded(StorageWrapper::new(data))
-        LoadingState::Setup(String::new())
+        LoadingState::Login
     }
 }
 
@@ -96,38 +112,63 @@ pub enum ColumnState {
 static COLUMN2: Atom<ColumnState> = |_| ColumnState::None;
 
 pub fn run_ui() {
-    dioxus::desktop::launch(App);
+    //dioxus::desktop::launch(App);
+    // use dioxus::desktop::wry::application::window::WindowBuilder
+    dioxus::desktop::launch_cfg(App, |c| {
+        c.with_window(default_menu)
+            .with_window(|w| w.with_title("My App"))
+    });
+}
+
+fn default_menu(builder: WindowBuilder) -> WindowBuilder {
+    use dioxus::desktop::tao::menu::{MenuBar as Menu, MenuItem};
+    let mut menu_bar_menu = Menu::new();
+    let mut first_menu = Menu::new();
+    first_menu.add_native_item(MenuItem::Copy);
+    first_menu.add_native_item(MenuItem::Paste);
+    first_menu.add_native_item(MenuItem::CloseWindow);
+    first_menu.add_native_item(MenuItem::Hide);
+    first_menu.add_native_item(MenuItem::Quit);
+    menu_bar_menu.add_submenu("My app", true, first_menu);
+    builder.with_title("Twittalypse").with_menu(menu_bar_menu)
 }
 
 fn App(cx: Scope) -> Element {
-    cx.use_hook(|_| {
-        cx.provide_context(LoadingState::default());
-    });
+    let loading_state = use_state(&cx, LoadingState::default);
+    // cx.use_hook(|_| {
+    //     cx.provide_context(LoadingState::default());
+    // });
 
-    let data = cx.use_hook(|_| cx.consume_context::<LoadingState>());
+    // let data = cx.use_hook(|_| cx.consume_context::<LoadingState>());
 
-    let view = match data {
-        Some(LoadingState::Loading(_)) => cx.render(rsx! {
-            LoadingComponent {
-
+    let view = match loading_state.get() {
+        LoadingState::Login => cx.render(rsx! {
+            LoginComponent {
+                loading_state: loading_state.clone()
             }
         }),
-        Some(LoadingState::Loaded(store)) => cx.render(rsx! {
+        LoadingState::Setup(config) => cx.render(rsx! {
+            SetupComponent {
+                config: config.clone(),
+                loading_state: loading_state.clone()
+            }
+        }),
+        LoadingState::Loading(config) => cx.render(rsx! {
+            LoadingComponent {
+                config: config.clone(),
+                loading_state: loading_state.clone()
+            }
+        }),
+        LoadingState::Loaded(store) => cx.render(rsx! {
             LoadedComponent {
                 storage: store.clone()
             }
         }),
-        Some(LoadingState::Setup(url)) => cx.render(rsx! {
-            SetupComponent {
-                url: url.clone()
-            }
-        }),
-        Some(LoadingState::Error(e)) => cx.render(rsx! {
+        LoadingState::Error(e) => cx.render(rsx! {
             div {
                 "{e}"
             }
         }),
-        None => todo!(),
     };
 
     rsx!(cx, div {
@@ -140,9 +181,198 @@ fn App(cx: Scope) -> Element {
     })
 }
 
+#[derive(Clone)]
+enum LoginState {
+    Initial,
+    LoadingPin(RequestData),
+    EnteredPin(RequestData, String),
+}
+
+#[derive(Clone)]
+enum LoginStateResult {
+    RequestData(RequestData),
+    LoggedIn(Config),
+    Error(String),
+    Waiting,
+}
+
+impl PartialEq for LoginState {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::LoadingPin(_), Self::LoadingPin(_)) => true,
+            (Self::EnteredPin(_, _), Self::EnteredPin(_, _)) => true,
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
+}
+
 #[inline_props]
-fn SetupComponent(cx: Scope, url: String) -> Element {
-    let loading_state = use_state(&cx, || Message::Loading(String::new()));
+fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Element {
+    let login_state = use_state(&cx, || LoginState::Initial);
+    let current = (*login_state.current()).clone();
+
+    let state_machine = use_future(&cx, login_state, move |login_state| {
+        let current = (*login_state.current()).clone();
+        async move {
+            match current {
+                LoginState::Initial => RequestData::request()
+                    .await
+                    .map(LoginStateResult::RequestData)
+                    .unwrap_or_else(|e| LoginStateResult::Error(e.to_string())),
+                LoginState::EnteredPin(data, pin) => data
+                    .validate(&pin)
+                    .await
+                    .map(LoginStateResult::LoggedIn)
+                    .unwrap_or_else(|e| LoginStateResult::Error(e.to_string())),
+                LoginState::LoadingPin(n) => LoginStateResult::RequestData(n),
+            }
+        }
+    });
+
+    let ui = match (state_machine.value(), current) {
+        (None, LoginState::Initial) => rsx!(div {
+            "Retrieving Login URL"
+        }),
+        (Some(LoginStateResult::RequestData(n)), LoginState::Initial) => rsx!(div {
+            a {
+                class: "btn btn-primary",
+                href: "{n.authorize_url}",
+                onclick: move |_| {
+                    login_state.set(LoginState::LoadingPin(n.clone()));
+                },
+
+                "Click here to login"
+            }
+        }),
+        (Some(LoginStateResult::RequestData(n)), LoginState::LoadingPin(_)) => rsx!(div {
+            h5 { "Please enter Pin"}
+            form {
+                onsubmit: |evt: FormEvent| {
+                    login_state.set(LoginState::EnteredPin(n.clone(), evt.values["pin"].to_string()));
+                    state_machine.restart();
+                },
+                prevent_default: "onsubmit",
+
+                input { "type": "text", id: "pin", name: "pin" }
+
+                button {
+                    r#type: "submit",
+                    class: "btn btn-primary",
+
+                    "Next"
+                }
+
+            }
+        }),
+        (Some(LoginStateResult::LoggedIn(c)), LoginState::EnteredPin(_, _)) => rsx!(div {
+            "Successfully logged in"
+            button {
+                r#type: "button",
+                class: "btn btn-primary",
+                onclick: move |_| {
+                    loading_state.set(LoadingState::Setup(c.clone()));
+                },
+
+                "Next"
+            }
+        }),
+        (Some(LoginStateResult::Error(e)), LoginState::LoadingPin(_)) => rsx!(div {
+            "Could not gerate URL: {e:?}"
+        }),
+        (Some(LoginStateResult::Error(e)), LoginState::EnteredPin(n, _)) => rsx!(div {
+            "Invalid Pin: {e:?} Please try again?"
+            button {
+                r#type: "button",
+                class: "btn btn-primary",
+                onclick: move |_| {
+                    login_state.set(LoginState::LoadingPin(n.clone()));
+                    state_machine.restart();
+                },
+
+                "Try Again"
+            }
+        }),
+        (Some(LoginStateResult::Error(e)), _) => rsx!(div {
+            "Error: {e:?} Please try again?"
+            button {
+                r#type: "button",
+                class: "btn btn-primary",
+                onclick: move |_| {
+                    login_state.set(LoginState::Initial);
+                    state_machine.restart();
+                },
+
+                "Try Again"
+            }
+        }),
+        _ => rsx!(div {
+            "Waiting"
+        }),
+    };
+
+    // let request_data = use_future(&cx, (), |_| async move { RequestData::request().await });
+    // let verify_pin = use_future(&cx, (), |)
+
+    // let element = match request_data.value() {
+    //     Some(Ok(data)) => rsx!(div {
+    //         a {
+    //             class: "btn btn-primary",
+    //             href: "{data.authorize_url}",
+    //             onclick: move |_| {
+    //                 // FIXME:
+    //                 // login_state.set(LoginState::TokenUrl(data.clone()));
+    //             },
+    //             "Click here to Log in"
+    //         }
+    //     }),
+    //     Some(Err(e)) => rsx!(div {
+    //         h5 { "Something went wrong" }
+    //         div {
+    //             class: "text-bg-danger p-3",
+    //             "{e}"
+    //         }
+    //     }),
+    //     None => rsx!(div {
+    //         class: "spinner-border"
+    //     }),
+    // };
+
+    // let pin_block = match *(login_state.current()) {
+    //     LoginState::EnteringPin(_) => rsx!(div {
+    //         h5 { "Please enter Pin"}
+    //         form {
+    //             onsubmit: onsubmit,
+    //             prevent_default: "onsubmit",
+
+    //             input { "type": "text", id: "pin", name: "pin" }
+    //         }
+    //     }),
+    //     _ => rsx!(div {}),
+    // };
+
+    cx.render(rsx! { div {
+        ui
+    }})
+}
+
+#[inline_props]
+fn SetupComponent(cx: Scope, config: Config, loading_state: UseState<LoadingState>) -> Element {
+    cx.render(rsx! { div {
+        h4 {
+            "Setup Config"
+        }
+        button {
+            r#type: "button",
+            class: "btn btn-primary",
+            onclick: move |_| loading_state.set(LoadingState::Loading(config.clone())),
+            "Next"
+        }
+    }})
+}
+
+#[inline_props]
+fn LoadingComponent(cx: Scope, config: Config, loading_state: UseState<LoadingState>) -> Element {
+    let message_state = use_state(&cx, || Message::Initial);
 
     let crawl = move |config: Config| {
         let (sender, mut receiver) = channel(256);
@@ -152,47 +382,54 @@ fn SetupComponent(cx: Scope, url: String) -> Element {
                 warn!("Error {e:?}");
             }
         });
-        // cx.spawn(async move {
         use_future(&cx, (), move |_| {
-            let mut loading_state = loading_state.clone();
+            let message_state = message_state.clone();
+            let loading_state = loading_state.clone();
             async move {
                 while let Some(msg) = receiver.recv().await {
-                    let finished = match &msg {
-                        Message::Finished(_) => true,
-                        _ => false,
+                    let finished = match msg {
+                        Message::Finished(o) => {
+                            // FIXME: Assign owned storage
+                            loading_state.set(LoadingState::Loaded(StorageWrapper::new(o)));
+                            true
+                        }
+                        other => {
+                            message_state.set(other);
+                            false
+                        }
                     };
-                    loading_state.set(msg);
                     if finished {
                         break;
                     }
                 }
             }
         });
-        // });
     };
 
-    // FIXME: Setup-config flow
-    let config = Config::open().unwrap();
-
-    cx.render(rsx! {
-        div {
-            div {
-                "{loading_state}"
+    let ui = match message_state.get() {
+        Message::Error(e) => rsx!(div {
+                 "Error: {e:?}"
             }
+        ),
+        Message::Finished(_) => rsx!(div {
+            // This should never appear here
+        }),
+        Message::Loading(msg) => rsx!(div {
+            h3 {
+                "Importing"
+            }
+            "{msg}"
+        }),
+        Message::Initial => rsx!(div {
             button {
-                onclick: move |_| crawl(config.clone())
+                r#type: "button",
+                class: "btn btn-secondary",
+                onclick: move |_| crawl(config.clone()),
+                "Begin Crawling"
             }
-        }
-    })
-}
-
-#[inline_props]
-fn LoadingComponent(cx: Scope) -> Element {
-    cx.render(rsx! {
-        div {
-            h1 { "Loading" }
-        }
-    })
+        }),
+    };
+    cx.render(ui)
 }
 
 #[inline_props]
@@ -261,7 +498,7 @@ fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -> El
                     class: "{column_class}",
                     style: "{column_style}",
                     TweetListComponent {
-                        data: &storage.data().tweets[0..50],
+                        data: &storage.data().tweets,
                         media: &storage.data().media,
                         label: label,
                         user: &storage.data().profile,
@@ -277,7 +514,7 @@ fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -> El
                     class: "{column_class}",
                     style: "{column_style}",
                     TweetListComponent {
-                        data: &storage.data().mentions[0..50],
+                        data: &storage.data().mentions,
                         media: &storage.data().media,
                         label: label.clone(),
                         user: &storage.data().profile,
@@ -376,6 +613,7 @@ fn SecondaryColumn(
     cx.render(rsx! {div {
         class: "d-grid gap-2",
         button {
+            r#type: "button",
             class: "btn btn-secondary",
             onclick: move |_| selected.set(ColumnState::None),
             "Close"

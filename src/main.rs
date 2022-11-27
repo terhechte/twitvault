@@ -22,46 +22,48 @@ use crate::types::Message;
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing();
-    let config = config::Config::load().await?;
+    // let config = config::Config::load().await?;
 
-    let storage_path = config::Config::archive_path();
+    // let storage_path = config::Config::archive_path();
 
     let name = "twittalypse";
 
-    println!("Storage: {}", storage_path.display());
-    let storage = Storage::open(&storage_path);
-    let cmd = match &storage {
-        Ok(existing) => clap::Command::new(name)
-            .bin_name(name)
-            .after_help(format!(
-                "Found an existing storage at {} for {}",
-                existing.root_folder.display(),
-                existing.data().profile.screen_name
-            ))
-            .subcommand_required(true)
-            .subcommand(clap::command!("sync"))
-            .subcommand(clap::command!("inspect"))
-            .subcommand(clap::command!("ui")),
-        Err(_) => clap::Command::new(name)
-            .bin_name(name)
-            .after_help(format!(
-                "Found no existing storage at {}",
-                Config::archive_path().display()
-            ))
-            .subcommand_required(false)
-            .subcommand(clap::command!("crawl"))
-            .subcommand(clap::command!("ui")),
-    };
+    ui::run_ui();
 
-    let matches = cmd.get_matches();
-    match (matches.subcommand(), storage) {
-        (Some(("crawl", _)), _) => action_crawl(&config, &storage_path).await?,
-        (Some(("inspect", _)), Ok(storage)) => action_inspect(&storage).await?,
-        (Some(("ui", _)), Ok(storage)) => action_ui(Some(storage)).await?,
-        (Some(("ui", _)), Err(_)) => action_ui(None).await?,
-        (Some(("sync", _)), Ok(storage)) => action_sync(&config, storage).await?,
-        _ => unreachable!("clap should ensure we don't get here"),
-    };
+    // println!("Storage: {}", storage_path.display());
+    // let storage = Storage::open(&storage_path);
+    // let cmd = match &storage {
+    //     Ok(existing) => clap::Command::new(name)
+    //         .bin_name(name)
+    //         .after_help(format!(
+    //             "Found an existing storage at {} for {}",
+    //             existing.root_folder.display(),
+    //             existing.data().profile.screen_name
+    //         ))
+    //         .subcommand_required(true)
+    //         .subcommand(clap::command!("sync"))
+    //         .subcommand(clap::command!("inspect"))
+    //         .subcommand(clap::command!("ui")),
+    //     Err(_) => clap::Command::new(name)
+    //         .bin_name(name)
+    //         .after_help(format!(
+    //             "Found no existing storage at {}",
+    //             Config::archive_path().display()
+    //         ))
+    //         .subcommand_required(false)
+    //         .subcommand(clap::command!("crawl"))
+    //         .subcommand(clap::command!("ui")),
+    // };
+
+    // let matches = cmd.get_matches();
+    // match (matches.subcommand(), storage) {
+    //     (Some(("crawl", _)), _) => action_crawl(&config, &storage_path).await?,
+    //     (Some(("inspect", _)), Ok(storage)) => action_inspect(&storage).await?,
+    //     (Some(("ui", _)), Ok(storage)) => action_ui(Some(storage)).await?,
+    //     (Some(("ui", _)), Err(_)) => action_ui(None).await?,
+    //     (Some(("sync", _)), Ok(storage)) => action_sync(&config, storage).await?,
+    //     _ => unreachable!("clap should ensure we don't get here"),
+    // };
 
     Ok(())
 }
@@ -93,6 +95,9 @@ fn log_task(mut receiver: Receiver<Message>) -> JoinHandle<Result<Storage>> {
     tokio::spawn(async move {
         while let Some(message) = receiver.recv().await {
             match message {
+                Message::Initial => {
+                    info!("Starting");
+                }
                 Message::Finished(m) => {
                     return Ok(m);
                 }
