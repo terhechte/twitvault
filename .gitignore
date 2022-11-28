@@ -1,1 +1,6 @@
 /target
+data
+API_KEY
+API_SECRET
+paging_positions.json
+twitter_settings.json
