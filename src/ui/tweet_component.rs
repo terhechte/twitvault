@@ -10,7 +10,7 @@ use crate::storage::UrlString;
 
 use egg_mode::tweet::Tweet;
 
-use super::loaded_component::{ColumnState, COLUMN2};
+use super::main_component::{ColumnState, COLUMN2};
 use super::user_component::AuthorImageComponent;
 
 #[derive(Props)]

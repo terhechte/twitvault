@@ -240,17 +240,25 @@ pub struct CrawlOptions {
     pub media: bool,
 }
 
+impl CrawlOptions {
+    pub fn changed(&self, change: impl FnOnce(&mut Self)) -> Self {
+        let mut copy = self.clone();
+        change(&mut copy);
+        copy
+    }
+}
+
 impl Default for CrawlOptions {
     fn default() -> Self {
         Self {
             tweets: true,
             tweet_responses: false,
             tweet_profiles: false,
-            mentions: false,
-            followers: false,
-            follows: false,
+            mentions: true,
+            followers: true,
+            follows: true,
             lists: false,
-            media: false,
+            media: true,
         }
     }
 }

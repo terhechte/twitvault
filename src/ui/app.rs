@@ -2,11 +2,11 @@
 use dioxus::desktop::tao::window::WindowBuilder;
 use dioxus::prelude::*;
 
-use super::loaded_component::LoadedComponent;
 use super::loading_component::LoadingComponent;
 use super::login_component::LoginComponent;
+use super::main_component::MainComponent;
 use super::setup_component::SetupComponent;
-use super::types::LoadingState;
+use super::types::{LoadingState, StorageWrapper};
 
 pub fn run_ui() {
     //dioxus::desktop::launch(App);
@@ -17,31 +17,57 @@ pub fn run_ui() {
     });
 }
 
+fn tmp_App(cx: Scope) -> Element {
+    let loading_state = use_state(&cx, LoadingState::default);
+    let config = crate::config::Config::open().unwrap();
+    cx.render(rsx!(div {
+        SetupComponent {
+            config: config,
+            loading_state: loading_state.clone()
+        }
+    }))
+}
+
 fn App(cx: Scope) -> Element {
     let loading_state = use_state(&cx, LoadingState::default);
-    let view = match loading_state.get() {
-        LoadingState::Login => cx.render(rsx! {
-            LoginComponent {
-                loading_state: loading_state.clone()
+    let storage: &UseState<Option<StorageWrapper>> = use_state(&cx, || None);
+    let view = match (storage.get(), loading_state.get()) {
+        (Some(n), _) => cx.render(rsx!(div {
+            MainComponent {
+                storage: n.clone()
+            }
+        })),
+        (None, LoadingState::Login) => cx.render(rsx! {
+            StartFlowContainer {
+                LoginComponent {
+                    loading_state: loading_state.clone()
+                }
             }
         }),
-        LoadingState::Setup(config) => cx.render(rsx! {
-            SetupComponent {
-                config: config.clone(),
-                loading_state: loading_state.clone()
+        (None, LoadingState::Setup(config)) => cx.render(rsx! {
+            StartFlowContainer {
+                SetupComponent {
+                    config: config.clone(),
+                    loading_state: loading_state.clone()
+                }
             }
         }),
-        LoadingState::Loading(config) => cx.render(rsx! {
-            LoadingComponent {
-                config: config.clone(),
-                loading_state: loading_state.clone()
+        (None, LoadingState::Loading(config)) => cx.render(rsx! {
+            StartFlowContainer {
+                LoadingComponent {
+                    config: config.clone(),
+                    loading_state: loading_state.clone()
+                }
             }
         }),
-        LoadingState::Loaded(store) => cx.render(rsx! {
-            LoadedComponent {
-                storage: store.clone()
-            }
-        }),
+        (None, LoadingState::Loaded(wrapper)) => {
+            storage.set(Some(wrapper.clone()));
+            cx.render(rsx! {
+                span {
+                    // "Done"
+                }
+            })
+        }
     };
 
     rsx!(cx, div {
@@ -50,7 +76,16 @@ fn App(cx: Scope) -> Element {
             rel: "stylesheet",
             crossorigin: "anonymous"
         },
-        view
+        header {
+            HeaderComponent {}
+        }
+        main {
+            class: "flex-shrink-0",
+            div {
+                class: "container",
+            }
+            view
+        }
     })
 }
 
@@ -65,4 +100,37 @@ fn default_menu(builder: WindowBuilder) -> WindowBuilder {
     first_menu.add_native_item(MenuItem::Quit);
     menu_bar_menu.add_submenu("My app", true, first_menu);
     builder.with_title("Twittalypse").with_menu(menu_bar_menu)
+}
+
+fn HeaderComponent(cx: Scope) -> Element {
+    cx.render(rsx!(nav {
+        class: "navbar navbar-expand-md navbar-dark fixed-top bg-dark",
+        div {
+            class: "container-fluid",
+            span {
+                class: "navbar-brand",
+                "My APp"
+            }
+            form {
+                class: "d-flex",
+                input {
+                    class: "form-control me-2",
+                    placeholder: "Search"
+                }
+            }
+        }
+    }))
+}
+
+#[derive(Props)]
+struct StartFlowContainerProps<'a> {
+    children: Element<'a>,
+}
+
+fn StartFlowContainer<'a>(cx: Scope<'a, StartFlowContainerProps<'a>>) -> Element {
+    cx.render(rsx!(
+    div {
+        class: "px-4 py-5 my-5 text-center",
+        &cx.props.children
+    }))
 }

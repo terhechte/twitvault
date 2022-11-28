@@ -2,7 +2,7 @@
 
 use dioxus::prelude::*;
 
-use super::loaded_component::Tab;
+use super::main_component::Tab;
 use super::tweet_list::TweetListComponent;
 use super::types::StorageWrapper;
 use super::user_list::AuthorListComponent;

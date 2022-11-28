@@ -9,6 +9,7 @@ use crate::config::Config;
 
 use crate::types::Message;
 
+use super::helpers::{Box, Spinner};
 use super::types::LoadingState;
 use super::types::StorageWrapper;
 
@@ -35,7 +36,6 @@ pub fn LoadingComponent(
                 while let Some(msg) = receiver.recv().await {
                     let finished = match msg {
                         Message::Finished(o) => {
-                            // FIXME: Assign owned storage
                             loading_state.set(LoadingState::Loaded(StorageWrapper::new(o)));
                             true
                         }
@@ -60,11 +60,15 @@ pub fn LoadingComponent(
         Message::Finished(_) => rsx!(div {
             // This should never appear here
         }),
-        Message::Loading(msg) => rsx!(div {
-            h3 {
-                "Importing"
+        Message::Loading(msg) => rsx!(Box {
+            title: "Importing"
+            Spinner {
+                title: ""
             }
-            "{msg}"
+            div {
+                class: "lead",
+                "{msg}"
+            }
         }),
         Message::Initial => rsx!(div {
             button {

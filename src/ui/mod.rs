@@ -1,7 +1,8 @@
 mod app;
-mod loaded_component;
+mod helpers;
 mod loading_component;
 mod login_component;
+mod main_component;
 mod primary_column;
 mod secondary_column;
 mod setup_component;

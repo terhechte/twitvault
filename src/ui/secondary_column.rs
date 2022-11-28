@@ -3,7 +3,7 @@
 use dioxus::fermi::{use_atom_state, AtomState};
 use dioxus::prelude::*;
 
-use super::loaded_component::{ColumnState, COLUMN2};
+use super::main_component::{ColumnState, COLUMN2};
 use super::tweet_list::TweetListComponent;
 use super::types::StorageWrapper;
 use super::user_component::AuthorComponent;

@@ -48,7 +48,7 @@ pub fn Divider(cx: Scope) -> Element {
 }
 
 #[inline_props]
-pub fn LoadedComponent(cx: Scope, storage: StorageWrapper) -> Element {
+pub fn MainComponent(cx: Scope, storage: StorageWrapper) -> Element {
     let selected = use_state(&cx, || Tab::Tweets);
 
     let column2 = use_atom_state(&cx, COLUMN2);

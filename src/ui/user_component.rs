@@ -7,7 +7,7 @@ use egg_mode::user::TwitterUser;
 
 use crate::storage::UrlString;
 
-use super::loaded_component::{ColumnState, COLUMN2};
+use super::main_component::{ColumnState, COLUMN2};
 use super::tweet_component::TweetComponent;
 
 #[derive(Props)]
