@@ -23,3 +23,4 @@ dioxus = { version = "0.2.4", features = ["desktop", "fermi"] }
 #dioxus-desktop = "0.2.3"
 obfstr = "0.4.1"
 clap = { version = "4.0.26", default_features = false, features = ["std", "help", "usage", "cargo"] }
+webbrowser = "0.6.0"

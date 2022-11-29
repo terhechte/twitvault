@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -10,7 +12,7 @@ use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-const ARCHIVE_PATH: &str = "test_responses2";
+const ARCHIVE_PATH: &str = "test_responses3";
 const SETTINGS_FILE: &str = "twitter_settings.json";
 const PAGING_FILE: &str = "paging_positions.json";
 
@@ -23,7 +25,7 @@ pub struct Config {
     /// has been established
     pub is_sync: bool,
     pub token: egg_mode::Token,
-    config_data: ConfigData,
+    pub config_data: ConfigData,
     /// Remember the paging positions for the different endpoints,
     /// so that restarting the crawler will continue where it left off.
     paging_positions: Arc<Mutex<PagingPositions>>,
@@ -50,6 +52,10 @@ impl Config {
 
     pub fn crawl_options(&self) -> &CrawlOptions {
         &self.config_data.crawl_options
+    }
+
+    pub fn set_crawl_options(&mut self, options: &CrawlOptions) {
+        self.config_data.crawl_options = options.clone();
     }
 }
 
@@ -211,8 +217,8 @@ impl RequestData {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-struct ConfigData {
-    username: String,
+pub struct ConfigData {
+    pub username: String,
     user_id: u64,
     key: String,
     secret: String,

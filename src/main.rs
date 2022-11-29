@@ -1,4 +1,3 @@
-#![allow(unused)]
 mod config;
 mod crawler;
 mod helpers;
@@ -23,11 +22,12 @@ use crate::types::Message;
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing();
-    // let config = config::Config::load().await?;
+    // let config = config::Config::open().ok();
 
-    // let storage_path = config::Config::archive_path();
+    let storage_path = config::Config::archive_path();
+    let storage = Storage::open(&storage_path);
 
-    ui::run_ui();
+    ui::run_ui(storage.ok());
 
     // println!("Storage: {}", storage_path.display());
     // let storage = Storage::open(&storage_path);
@@ -127,12 +127,12 @@ async fn action_inspect(storage: &Storage) -> Result<()> {
     Ok(())
 }
 
-async fn action_ui(storage: Option<Storage>) -> Result<()> {
+async fn action_ui(_storage: Option<Storage>) -> Result<()> {
     // action_inspect(&storage).await?;
     // FIXME:
     // This will re-open the storage
     // std::mem::drop(storage);
-    ui::run_ui();
+    ui::run_ui(None);
     Ok(())
 }
 

@@ -6,7 +6,7 @@ use dioxus::prelude::*;
 
 use crate::config::{Config, RequestData};
 
-use super::helpers::{Box, Spinner};
+use super::helpers::{Box, NextButton, Spinner};
 use super::types::LoadingState;
 
 #[derive(Clone)]
@@ -57,17 +57,14 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
     });
 
     let ui = match (state_machine.value(), current) {
-        (None, LoginState::Initial) => rsx!(div {
+        (None, LoginState::Initial) => rsx!(Box {
+            title: "Please Wait",
             Spinner {
-                title: "Retrieving Login URL"
+                title: "Retrieving Login URL".to_string()
             }
         }),
         (Some(LoginStateResult::RequestData(n)), LoginState::Initial) => rsx!(Box {
             title: "WWelcome",
-            // on_click: move |_| {
-            //     login_state.set(LoginState::LoadingPin(n.clone()));
-            // }
-            // href: n.authorize_url.clone(),
             p {
                 class: "lead",
                 "This app will archive your Twitter account, including profiles, mentions and even responses."
@@ -76,29 +73,41 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 "When you press the button, a browser window will open to give this app access to read your Twitter account"
             }
             p {
-                "The app is called SwiftWatch because I can't access the Twitter Dashboard. This is the only API Key I have"
-            }
-            p {
                 "Once you give access, you will see a pin-code. Enter it here to proceed to the next step"
             }
-            div {
-                class: "d-grid gap-2",
-                a {
-                    class: "btn btn-primary",
-                    href: "{n.authorize_url}",
-                    onclick: move |_| {
-                        login_state.set(LoginState::LoadingPin(n.clone()));
-                    },
 
-                    "Next"
+            div {
+                class: "card text-bg-light mb-3",
+                div {
+                    class: "card-header",
+                    "Note:"
                 }
+                div {
+                    class: "card-body",
+                    p {
+                        class: "card-text",
+                        "The app is called "
+                        strong {
+                            "SwiftWatch "
+                        }
+                        "because I can't access the Twitter Dashboard. This is the only API Key I have"
+                    }
+                }
+            }
+            NextButton {
+                title: "Next",
+                kind: "button",
+                onclick: move |_| {
+                    webbrowser::open(&n.authorize_url);
+                    login_state.set(LoginState::LoadingPin(n.clone()));
+                },
             }
         }),
         (Some(LoginStateResult::RequestData(n)), LoginState::LoadingPin(_)) => rsx!(Box {
             title: "Enter Pin",
             p {
                 class: "lead",
-                "Please enter the pin-code from your browser"
+                "Please enter the pin-code from your browser."
             }
             form {
                 onsubmit: |evt: FormEvent| {
@@ -107,36 +116,61 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 },
                 prevent_default: "onsubmit",
 
-                input { "type": "text", id: "pin", name: "pin" }
-
                 div {
-                    class: "d-grid gap-2",
-                    button {
-                        r#type: "submit",
-                        class: "btn btn-primary",
+                    class: "vstack gap-3",
+                    input {
+                        class: "form-control",
+                        "type": "text",
+                        id: "pin",
+                        name: "pin"
+                    }
 
-                        "Next"
+                    div {
+                        class: "alert alert-info",
+                        h6 {
+                            "The following URL should have opened in a browser"
+                        }
+                        small {
+                            a {
+                                href: "{n.authorize_url}",
+                                "{n.authorize_url}"
+                            }
+                        }
+                    }
+
+                    NextButton {
+                        title: "Next",
+                        kind: "submit",
+                        onclick: move |_| { },
                     }
                 }
+                // div {
+                //     class: "d-grid gap-2",
+                //     button {
+                //         r#type: "submit",
+                //         class: "btn btn-primary",
+
+                //         "Next"
+                //     }
+                // }
             }
         }),
         (Some(LoginStateResult::LoggedIn(c)), LoginState::EnteredPin(_, _)) => rsx!(Box {
-            title: "Logged In",
+            title: "Success!",
             p {
                 class: "lead",
-                "In the next step, you can configure which data you wish to archive"
-            }
-            div {
-                class: "d-grid gap-2",
-                button {
-                    r#type: "button",
-                    class: "btn btn-primary",
-                    onclick: move |_| {
-                        loading_state.set(LoadingState::Setup(c.clone()));
-                    },
-
-                    "Next"
+                strong {
+                    "Welcome {c.config_data.username} "
                 }
+                "In the next step, you can configure which data you wish to archive."
+            }
+
+            NextButton {
+                title: "Next",
+                kind: "button",
+                onclick: move |_| {
+                    loading_state.set(LoadingState::Setup(c.clone()));
+                },
             }
         }),
         (Some(LoginStateResult::Error(e)), LoginState::LoadingPin(n)) => rsx!(Box {
@@ -145,15 +179,13 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 class: "alert alert-danger",
                 "{e:?}"
             }
-            button {
-                r#type: "button",
-                class: "btn btn-primary",
+            NextButton {
+                title: "Try Again",
+                kind: "button",
                 onclick: move |_| {
                     login_state.set(LoginState::LoadingPin(n.clone()));
                     state_machine.restart();
                 },
-
-                "Try Again"
             }
         }),
         (Some(LoginStateResult::Error(e)), LoginState::EnteredPin(n, _)) => rsx!(Box {
@@ -162,15 +194,13 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 class: "alert alert-danger",
                 "{e:?}"
             }
-            button {
-                r#type: "button",
-                class: "btn btn-primary",
+            NextButton {
+                title: "Try Again",
+                kind: "button",
                 onclick: move |_| {
                     login_state.set(LoginState::LoadingPin(n.clone()));
                     state_machine.restart();
                 },
-
-                "Try Again"
             }
         }),
         (Some(LoginStateResult::Error(e)), _) => rsx!(Box {
@@ -179,19 +209,22 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 class: "alert alert-danger",
                 "{e:?}"
             }
-            button {
-                r#type: "button",
-                class: "btn btn-primary",
+            NextButton {
+                title: "Try Again",
+                kind: "button",
                 onclick: move |_| {
                     login_state.set(LoginState::Initial);
                     state_machine.restart();
                 },
-
-                "Try Again"
             }
         }),
         _ => rsx!(div {
-            "Waiting"
+            Box {
+                title: "Please Wait",
+                Spinner {
+                    title: "Loading".to_string()
+                }
+            }
         }),
     };
 

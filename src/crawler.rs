@@ -11,6 +11,7 @@ use reqwest::Client;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::io::Write;
+use std::time::{Duration, SystemTime};
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
@@ -21,6 +22,7 @@ use tokio::sync::{
     mpsc::{channel, Sender},
     Mutex,
 };
+use tokio::time::Instant;
 use tracing::{info, trace, warn};
 
 use eyre::{bail, Result};
@@ -88,6 +90,8 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
             warn!("Could not write out data {e:?}");
         }
     }
+
+    dbg!(&config.crawl_options());
 
     let (instruction_sender, mut instruction_receiver) = channel(4096);
     let cloned_storage = shared_storage.clone();
@@ -172,6 +176,11 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         save_data(&shared_storage).await;
     }
 
+    sender
+        .send(Message::Loading("Downloading Media".to_string()))
+        .await
+        .unwrap();
+
     instruction_sender.send(DownloadInstruction::Done).await?;
     instruction_task.await?;
 
@@ -211,11 +220,18 @@ async fn fetch_user_tweets(
             if is_sync && Some(tweet.id) == first_id.as_ref().map(|e| e.id) {
                 break 'outer;
             }
-            inspect_tweet(tweet, shared_storage.clone(), config, &sender).await?;
+            inspect_tweet(
+                tweet,
+                shared_storage.clone(),
+                config,
+                &sender,
+                &message_sender,
+            )
+            .await?;
         }
         collected.append(&mut feed.response);
 
-        handle_rate_limit(&feed.rate_limit_status, "User Feed").await;
+        handle_rate_limit(&feed.rate_limit_status, "User Feed", message_sender.clone()).await;
         timeline = next_timeline;
         config.set_paging_position("user_tweets", timeline.min_id);
 
@@ -268,11 +284,23 @@ async fn fetch_user_mentions(
             if is_sync && Some(tweet.id) == first_id.as_ref().map(|e| e.id) {
                 break 'outer;
             }
-            inspect_tweet(tweet, shared_storage.clone(), config, &sender).await?;
+            inspect_tweet(
+                tweet,
+                shared_storage.clone(),
+                config,
+                &sender,
+                &message_sender,
+            )
+            .await?;
         }
         collected.append(&mut feed.response);
 
-        handle_rate_limit(&feed.rate_limit_status, "User Mentions").await;
+        handle_rate_limit(
+            &feed.rate_limit_status,
+            "User Mentions",
+            message_sender.clone(),
+        )
+        .await;
         timeline = next_timeline;
         config.set_paging_position("user_mentions", timeline.min_id);
 
@@ -300,7 +328,7 @@ async fn fetch_user_followers(
 ) -> Result<()> {
     let followers = { shared_storage.lock().await.data().followers.clone() };
     let ids = fetch_profiles_ids(
-        "followers",
+        "Followers",
         user::followers_ids(id, &config.token).with_page_size(50),
         shared_storage.clone(),
         config,
@@ -322,7 +350,7 @@ async fn fetch_user_follows(
 ) -> Result<()> {
     let follows = { shared_storage.lock().await.data().follows.clone() };
     let ids = fetch_profiles_ids(
-        "follows",
+        "Follows",
         user::friends_ids(id, &config.token).with_page_size(50),
         shared_storage.clone(),
         config,
@@ -359,10 +387,17 @@ async fn fetch_profiles_ids(
         let called = cursor.call();
         let resp = match called.await {
             Ok(n) => n,
-            Err(e) => {
-                warn!("Profile Ids Error {e:?}");
-                continue;
-            }
+            Err(e) => match e {
+                egg_mode::error::Error::RateLimit(limit) => {
+                    msg("Rate limit for {kind} reached", &message_sender).await;
+                    sleep_until(limit).await;
+                    continue;
+                }
+                _ => {
+                    warn!("Profile Ids Error {e:?}");
+                    continue;
+                }
+            },
         };
 
         let new_ids = resp.response.ids.clone();
@@ -394,7 +429,7 @@ async fn fetch_profiles_ids(
             break;
         }
 
-        handle_rate_limit(&resp.rate_limit_status, kind).await;
+        handle_rate_limit(&resp.rate_limit_status, kind, message_sender.clone()).await;
         cursor.next_cursor = resp.response.next_cursor;
         config.set_paging_position(kind, u64::try_from(cursor.next_cursor).ok());
     }
@@ -453,12 +488,20 @@ async fn fetch_lists(
         .unwrap_or(-1);
     loop {
         let called = cursor.call();
+
         let resp = match called.await {
             Ok(n) => n,
-            Err(e) => {
-                warn!("Lists Error {e:?}");
-                continue;
-            }
+            Err(e) => match e {
+                egg_mode::error::Error::RateLimit(limit) => {
+                    msg("Rate limit for Lists reached", &message_sender).await;
+                    sleep_until(limit).await;
+                    continue;
+                }
+                _ => {
+                    warn!("Lists Error {e:?}");
+                    continue;
+                }
+            },
         };
 
         let lists = resp.response.lists;
@@ -474,10 +517,17 @@ async fn fetch_lists(
                 &message_sender,
             )
             .await;
-            fetch_list_members(list, shared_storage.clone(), config, sender.clone()).await?;
+            fetch_list_members(
+                list,
+                shared_storage.clone(),
+                config,
+                sender.clone(),
+                message_sender.clone(),
+            )
+            .await?;
         }
 
-        handle_rate_limit(&resp.rate_limit_status, "Lists").await;
+        handle_rate_limit(&resp.rate_limit_status, "Lists", message_sender.clone()).await;
         cursor.next_cursor = resp.response.next_cursor;
         config.set_paging_position("lists", u64::try_from(cursor.next_cursor).ok());
     }
@@ -491,6 +541,7 @@ async fn fetch_list_members(
     shared_storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
 ) -> Result<()> {
     // Lists are not really synced, they're just not downloaded if they already exists
     if config.is_sync {
@@ -516,10 +567,17 @@ async fn fetch_list_members(
         let called = cursor.call();
         let resp = match called.await {
             Ok(n) => n,
-            Err(e) => {
-                warn!("List Members Error {e:?}");
-                continue;
-            }
+            Err(e) => match e {
+                egg_mode::error::Error::RateLimit(limit) => {
+                    msg("Rate limit for Lists Members reached", &message_sender).await;
+                    sleep_until(limit).await;
+                    continue;
+                }
+                _ => {
+                    warn!("Lists Members Error {e:?}");
+                    continue;
+                }
+            },
         };
 
         if resp.users.is_empty() {
@@ -540,7 +598,12 @@ async fn fetch_list_members(
                 .insert(member.id, member.clone());
         }
 
-        handle_rate_limit(&resp.rate_limit_status, "List Members").await;
+        handle_rate_limit(
+            &resp.rate_limit_status,
+            "List Members",
+            message_sender.clone(),
+        )
+        .await;
         cursor.next_cursor = resp.response.next_cursor;
         config.set_paging_position(&paging_key, u64::try_from(cursor.next_cursor).ok());
     }
@@ -591,6 +654,7 @@ async fn inspect_tweet(
     storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: &Sender<DownloadInstruction>,
+    message_sender: &Sender<Message>,
 ) -> Result<()> {
     if let Err(e) = inspect_inner_tweet(tweet, config, &storage, sender.clone()).await {
         warn!("Inspect Tweet Error {e:?}");
@@ -611,7 +675,9 @@ async fn inspect_tweet(
     if config.crawl_options().tweet_responses {
         // for our own tweets, we search for responses
         if tweet.user.is_none() || tweet.user.as_ref().map(|e| e.id) == Some(config.user_id()) {
-            if let Err(e) = fetch_tweet_replies(tweet, storage.clone(), config, sender).await {
+            if let Err(e) =
+                fetch_tweet_replies(tweet, storage.clone(), config, sender, message_sender).await
+            {
                 warn!("Could not fetch replies for tweet {}: {e:?}", tweet.id);
             }
         }
@@ -656,13 +722,28 @@ async fn fetch_tweet_replies(
     storage: Arc<Mutex<Storage>>,
     config: &Config,
     sender: &Sender<DownloadInstruction>,
+    message_sender: &Sender<Message>,
 ) -> Result<()> {
     let search_results = egg_mode::search::search(format!("to:{}", config.screen_name()))
         .since_tweet(tweet.id)
         .count(100)
         .call(&config.token)
         .await?;
-    handle_rate_limit(&search_results.rate_limit_status, "Tweet Replies").await;
+    handle_rate_limit(
+        &search_results.rate_limit_status,
+        "Tweet Replies",
+        message_sender.clone(),
+    )
+    .await;
+
+    msg(
+        format!(
+            "Processing {} responses",
+            search_results.response.statuses.len()
+        ),
+        &message_sender,
+    )
+    .await;
 
     let mut replies = Vec::new();
 
@@ -773,7 +854,7 @@ fn extension_for_url(url: &str) -> String {
 }
 
 /// If the rate limit for a call is used up, delay that particular call
-async fn handle_rate_limit(limit: &RateLimit, call_info: &'static str) {
+async fn handle_rate_limit(limit: &RateLimit, call_info: &'static str, sender: Sender<Message>) {
     if limit.remaining <= 1 {
         let seconds = {
             use std::time::{SystemTime, UNIX_EPOCH};
@@ -783,6 +864,11 @@ async fn handle_rate_limit(limit: &RateLimit, call_info: &'static str) {
             }
         };
         info!("Rate limit for {call_info} reached. Waiting {seconds} seconds");
+        sender
+            .send(Message::Loading(format!(
+                "Rate limit for {call_info} reached. Waiting {seconds} seconds"
+            )))
+            .await;
         let wait_duration = tokio::time::Duration::from_secs(seconds);
         tokio::time::sleep(wait_duration).await;
     } else {
@@ -792,4 +878,18 @@ async fn handle_rate_limit(limit: &RateLimit, call_info: &'static str) {
             limit.limit
         );
     }
+}
+
+async fn sleep_until(time: i32) {
+    if time < 0 {
+        return;
+    }
+    let time = time as u64;
+    let system_time = SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(time);
+    let seconds = system_time
+        .duration_since(SystemTime::now())
+        .map(|e| e.as_secs())
+        .unwrap_or(1000);
+    let wait_duration = tokio::time::Duration::from_secs(seconds);
+    tokio::time::sleep(wait_duration).await;
 }

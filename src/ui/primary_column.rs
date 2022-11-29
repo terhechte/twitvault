@@ -13,7 +13,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
     let label = current.to_string();
 
     let column_class = "d-flex flex-column flex-shrink-0 bg-light";
-    let column_style = "width: 35rem; overflow: scroll; padding: 12px; height: 100vh;";
+    let column_style = "width: 30rem; overflow: scroll; padding: 8px; height: 100vh;";
 
     cx.render(rsx!(div {
         {if current == Tab::Tweets {

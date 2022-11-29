@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 
 use tokio::sync::mpsc::channel;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::config::Config;
 
@@ -19,65 +19,95 @@ pub fn LoadingComponent(
     config: Config,
     loading_state: UseState<LoadingState>,
 ) -> Element {
+    let appeared = cx.use_hook(|_| false);
     let message_state = use_state(&cx, || Message::Initial);
 
-    let crawl = move |config: Config| {
-        let (sender, mut receiver) = channel(256);
+    // let crawl = move |config: Config| {
+    let (sender, mut receiver) = channel(4096);
+    if !*appeared {
+        *appeared = true;
+        let cloned_config = config.clone();
         cx.spawn(async move {
+            info!("BEGIN ANOTHER CRAWL");
+            warn!("BEGIN ANOTHER CRAWL");
             let path = Config::archive_path();
-            if let Err(e) = crate::crawler::crawl_new_storage(config, &path, sender).await {
+            if let Err(e) = crate::crawler::crawl_new_storage(cloned_config, &path, sender).await {
                 warn!("Error {e:?}");
             }
         });
-        use_future(&cx, (), move |_| {
-            let message_state = message_state.clone();
-            let loading_state = loading_state.clone();
-            async move {
-                while let Some(msg) = receiver.recv().await {
-                    let finished = match msg {
-                        Message::Finished(o) => {
-                            loading_state.set(LoadingState::Loaded(StorageWrapper::new(o)));
-                            true
-                        }
-                        other => {
-                            message_state.set(other);
-                            false
-                        }
-                    };
-                    if finished {
-                        break;
+    }
+    // });
+    let future = use_future(&cx, (), move |_| {
+        let message_state = message_state.clone();
+        let loading_state = loading_state.clone();
+        async move {
+            info!("Enter msg loop");
+            warn!("Enter msg loop");
+            while let Some(msg) = receiver.recv().await {
+                let finished = match msg {
+                    Message::Finished(o) => {
+                        loading_state.set(LoadingState::Loaded(StorageWrapper::new(o)));
+                        true
                     }
+                    other => {
+                        message_state.set(other);
+                        false
+                    }
+                };
+                if finished {
+                    break;
                 }
             }
-        });
-    };
+        }
+    });
+    // };
 
     let ui = match message_state.get() {
         Message::Error(e) => rsx!(div {
-                 "Error: {e:?}"
+            class: "alert alert-warning",
+                h3 {
+                    "Uh oh. Something went wrong",
+                }
+                "{e:?}"
             }
         ),
         Message::Finished(_) => rsx!(div {
             // This should never appear here
         }),
-        Message::Loading(msg) => rsx!(Box {
-            title: "Importing"
-            Spinner {
-                title: ""
+        Message::Loading(msg) => rsx!(div {
+            class: "alert alert-info",
+            h3 {
+                "Importing"
             }
-            div {
-                class: "lead",
-                "{msg}"
+            Spinner {
+                title: format!("{msg}")
             }
         }),
         Message::Initial => rsx!(div {
-            button {
-                r#type: "button",
-                class: "btn btn-secondary",
-                onclick: move |_| crawl(config.clone()),
-                "Begin Crawling"
+            class: "alert alert-info",
+            h3 {
+                "Importing"
             }
         }),
     };
-    cx.render(ui)
+
+    let value = match future.value() {
+        Some(_) => "Done!",
+        None => "Note: This can take a long time. Depending on your tweets, followers and lists, up to hours.",
+    };
+
+    cx.render(rsx!(Box {
+        title: "Hard at Work",
+        div {
+            class: "card",
+            div {
+                class: "card-body",
+                ui
+                div {
+                    class: "alert alert-info",
+                    "{value}"
+                }
+            }
+        }
+    }))
 }

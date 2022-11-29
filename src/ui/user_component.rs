@@ -129,24 +129,21 @@ pub struct AuthorImageProps<'a> {
 pub fn AuthorImageComponent<'a>(cx: Scope<'a, AuthorImageProps>) -> Element<'a> {
     let column2 = use_atom_state(&cx, COLUMN2);
     let url = &cx.props.profile.profile_image_url_https;
-    let node = cx
+    let ref_url = cx
         .props
         .media
         .get(url)
-        .map(|entry| entry.display())
-        .map(|entry| {
-            rsx!(
-                div {
-                    style: "margin: 0.6rem; margin-top: 0.8rem;",
-                    onclick: move |_| column2.set(ColumnState::Profile(cx.props.profile.id)),
-                    img {
-                        style: "border-radius: 50%; width: 2rem; height: 2rem;",
-                        src: "{entry}",
-                    }
-                }
-            )
-        })
-        .unwrap_or_else(|| rsx!(div {}));
+        .map(|entry| entry.display().to_string())
+        .unwrap_or_else(|| url.clone());
 
-    cx.render(node)
+    cx.render(rsx!(
+        div {
+            style: "margin: 0.6rem; margin-top: 0.8rem;",
+            onclick: move |_| column2.set(ColumnState::Profile(cx.props.profile.id)),
+            img {
+                style: "border-radius: 50%; width: 2rem; height: 2rem;",
+                src: "{ref_url}",
+            }
+        }
+    ))
 }

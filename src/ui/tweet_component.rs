@@ -37,7 +37,13 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                 _ => None,
             })
         })
-        .and_then(|entry| cx.props.media.get(&entry).map(|path| path.display()))
+        .map(|entry| {
+            cx.props
+                .media
+                .get(&entry)
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| entry.clone())
+        })
         .map(|entry| {
             rsx!(img {
                 src: "{entry}",
@@ -53,7 +59,13 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                 _ => None,
             })
         })
-        .and_then(|entry| cx.props.media.get(&entry).map(|path| path.display()))
+        .map(|entry| {
+            cx.props
+                .media
+                .get(&entry)
+                .map(|path| path.display().to_string())
+                .unwrap_or_else(|| entry.clone())
+        })
         .map(|entry| {
             rsx!( div {
                 class: "ratio ratio-16x9",

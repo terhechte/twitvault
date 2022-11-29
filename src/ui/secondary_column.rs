@@ -3,6 +3,7 @@
 use dioxus::fermi::{use_atom_state, AtomState};
 use dioxus::prelude::*;
 
+use super::helpers::Box;
 use super::main_component::{ColumnState, COLUMN2};
 use super::tweet_list::TweetListComponent;
 use super::types::StorageWrapper;
@@ -21,7 +22,8 @@ pub fn SecondaryColumn(
     }
 
     let column_class = "d-flex flex-column flex-shrink-0 bg-light";
-    let column_style = "width: 35rem; overflow: scroll; padding: 12px; height: 100vh;";
+    let column_style =
+        "flex-basis: 28rem; width: 28rem; overflow: scroll; padding: 8; height: 100vh;";
 
     let column = cx.render(rsx!(div {
         {if let ColumnState::Responses(id) = column2.current().as_ref() {
@@ -54,8 +56,16 @@ pub fn SecondaryColumn(
                     }
                 }
             } else {
-                rsx! { div {
-                    "Profile {id} not found"
+                rsx! { Box {
+                    title: "Unknown Profile"
+                    p {
+                        class: "m-4",
+                        "Profile for user with id  "
+                        strong {
+                            "{id} "
+                        }
+                        "not found"
+                    }
                 }}
             }
         } else {rsx!{ div {} }}}
@@ -63,10 +73,10 @@ pub fn SecondaryColumn(
     }));
 
     cx.render(rsx! {div {
-        class: "d-grid gap-2",
+        class: "vstack gap-2",
         button {
             r#type: "button",
-            class: "btn btn-secondary",
+            class: "btn btn-secondary m-2",
             onclick: move |_| selected.set(ColumnState::None),
             "Close"
         }
