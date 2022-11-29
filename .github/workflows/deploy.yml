@@ -10,15 +10,25 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macOS-latest]
+        os: [macOS-latest, windows-2019, ubuntu-latest]
         include:
+          - os: ubuntu-latest
+            command: |
+                sudo apt-get update && sudo apt-get install libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libspeechd-dev libxkbcommon-dev libssl-dev libgtk-3-dev
+                cargo install cargo-bundle
+                ./build_linux.sh
+            binary: target/release/bundle/deb/twatvault_0.1.0_amd64.deb
           - os: macOS-latest
             command: |
+                rustup target add aarch64-apple-darwin
                 rustup target add x86_64-apple-darwin
-                cargo build --release --target=x86_64-apple-darwin
-                cd ../target/release/
-                /usr/bin/zip -5 -r ../../../twittalypse.zip ./twittalypse.app
-            binary: target/twittalypse.zip
+                cargo install cargo-bundle
+                ./build_mac.sh
+            binary: target/twatvault.zip
+          - os: windows-2019
+            command: |
+                .\build_windows.bat
+            binary: target\release\twatvault.exe
     steps:
       - name: Production Build
         uses: actions/checkout@v2
