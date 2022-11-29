@@ -56,15 +56,18 @@ pub fn SecondaryColumn(
                     }
                 }
             } else {
-                rsx! { Box {
-                    title: "Unknown Profile"
-                    p {
-                        class: "m-4",
-                        "Profile for user with id  "
-                        strong {
-                            "{id} "
+                rsx! { div {
+                    class: "p-3",
+                    Box {
+                        title: "Unknown Profile"
+                        p {
+                            class: "m-4",
+                            "Profile for user with id  "
+                            strong {
+                                "{id} "
+                            }
+                            "not found"
                         }
-                        "not found"
                     }
                 }}
             }

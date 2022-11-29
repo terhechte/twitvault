@@ -87,7 +87,6 @@ pub fn SetupComponent(cx: Scope, config: Config, loading_state: UseState<Loading
                     let new_params = params.get();
                     let mut new_config = config.clone();
                     new_config.set_crawl_options(new_params);
-                    dbg!(&new_config);
                     loading_state.set(LoadingState::Loading(new_config))
                 },
             }

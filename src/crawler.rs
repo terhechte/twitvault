@@ -44,7 +44,10 @@ pub async fn crawl_new_storage(
 ) -> Result<()> {
     let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
     let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
-    let storage = Storage::new(user.clone(), storage_path)?;
+    let mut storage = Storage::new(user.clone(), storage_path)?;
+    storage.with_data(|d| {
+        d.profiles.insert(user.id, user.clone());
+    });
     crawl_into_storage(config, storage, message_sender).await
 }
 
@@ -89,8 +92,6 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
             warn!("Could not write out data {e:?}");
         }
     }
-
-    dbg!(&config.crawl_options());
 
     let (instruction_sender, mut instruction_receiver) = channel(4096);
     let cloned_storage = shared_storage.clone();
