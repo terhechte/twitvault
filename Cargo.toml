@@ -14,7 +14,7 @@ exclude = ["data", "assets", ".vscode", "icons.sketch"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package.metadata.bundle]
-name = "Postsack"
+name = "TwatVault"
 identifier = "com.stylemac.twatvault"
 icon = ["icons/Icon.icns", "icons/win-256.png", "icons/win-32.png"]
 version = "1.0.0"
