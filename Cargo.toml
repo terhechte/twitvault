@@ -2,8 +2,26 @@
 name = "twatvault"
 version = "0.1.0"
 edition = "2021"
+description = "Archive your Twitter data into a offline desktop app"
+authors = ["Benedikt Terhechte"]
+license = "MIT"
+readme = "README.md"
+keywords = ["app", "dioxus", "archive", "twitter", "desktop", "windows", "macos", "linux"]
+categories = ["GUI", "Visualization"]
+repository = "https://github.com/terhechte/bevy_quickmenu"
+exclude = ["data", "assets", ".vscode", "icons.sketch"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[package.metadata.bundle]
+name = "Postsack"
+identifier = "com.stylemac.postsack"
+icon = ["icons/Icon.icns", "icons/win-256.png", "icons/win-32.png"]
+version = "1.0.0"
+copyright = "Copyright (c) Benedikt Terhechte (2022). All rights reserved."
+category = "Social Network"
+short_description = "Archive your Twitter data into a offline desktop app"
+osx_minimum_system_version = "10.12"
 
 [dependencies]
 futures = "0.3.25"
