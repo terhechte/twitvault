@@ -33,7 +33,11 @@ jobs:
     steps:
       - name: Production Build
         uses: actions/checkout@v2
-      - run: ${{ matrix.command }}
+      - run: |
+          ${{ matrix.command }}
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          API_SECRET: ${{ secrets.API_SECRET }}
       - name: Archive production artifacts
         uses: actions/upload-artifact@v2
         with:
