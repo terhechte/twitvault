@@ -37,6 +37,8 @@ impl PartialEq for Config {
     }
 }
 
+impl Eq for Config {}
+
 impl Config {
     pub fn archive_path() -> PathBuf {
         PathBuf::from_str(ARCHIVE_PATH).unwrap()

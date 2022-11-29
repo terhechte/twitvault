@@ -57,12 +57,6 @@ impl Eq for StorageWrapper {}
 
 impl Default for LoadingState {
     fn default() -> Self {
-        // TEMPORARY
-        //let data = Storage::open("archive_terhechte").unwrap();
-
-        // let s = Config::archive_path();
-        // let data = Storage::open(s).unwrap();
-        // LoadingState::Loaded(StorageWrapper::new(data))
         LoadingState::Login
     }
 }

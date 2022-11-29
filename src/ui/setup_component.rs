@@ -98,22 +98,3 @@ pub fn SetupComponent(cx: Scope, config: Config, loading_state: UseState<Loading
         }
     }})
 }
-
-// #[inline_props]
-// fn Entry(cx: Scope, label: &'static str, checked: bool, disabled: bool) -> Element {
-//     let checked = if *checked { "checked" } else { " " };
-//     let disabled = if *disabled { "disabled" } else { " " };
-//     cx.render(rsx! { div {
-//         class: "form-check",
-//         input {
-//             class: "form-check-input {checked} {disabled}",
-//             r#type: "checkbox",
-//             id: "{label}"
-//         }
-//         label {
-//             class: "form-check-label",
-//             r#for: "{label}",
-//             "{label}"
-//         }
-//     }})
-// }

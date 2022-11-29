@@ -3,6 +3,7 @@
 use dioxus::events::*;
 
 use dioxus::prelude::*;
+use tracing::warn;
 
 use crate::config::{Config, RequestData};
 
@@ -32,6 +33,8 @@ impl PartialEq for LoginState {
         }
     }
 }
+
+impl Eq for LoginState {}
 
 #[inline_props]
 pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Element {
@@ -98,7 +101,9 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 title: "Next",
                 kind: "button",
                 onclick: move |_| {
-                    webbrowser::open(&n.authorize_url);
+                    if let Err(e) = webbrowser::open(&n.authorize_url) {
+                        warn!("Could not open browser: {e:?}");
+                    }
                     login_state.set(LoginState::LoadingPin(n.clone()));
                 },
             }
@@ -144,15 +149,6 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                         onclick: move |_| { },
                     }
                 }
-                // div {
-                //     class: "d-grid gap-2",
-                //     button {
-                //         r#type: "submit",
-                //         class: "btn btn-primary",
-
-                //         "Next"
-                //     }
-                // }
             }
         }),
         (Some(LoginStateResult::LoggedIn(c)), LoginState::EnteredPin(_, _)) => rsx!(Box {

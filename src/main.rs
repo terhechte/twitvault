@@ -10,7 +10,7 @@ use tokio::{
     sync::mpsc::{channel, Receiver},
     task::JoinHandle,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use config::Config;
 use storage::Storage;
@@ -22,47 +22,50 @@ use crate::types::Message;
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing();
-    // let config = config::Config::open().ok();
-
+    let name = "twittalypse";
     let storage_path = config::Config::archive_path();
+    println!("Try opening Storage: {}", storage_path.display());
+
+    let config = config::Config::open().ok();
+
     let storage = Storage::open(&storage_path);
+    let cmd = match &storage {
+        Ok(existing) => clap::Command::new(name)
+            .bin_name(name)
+            .after_help(format!(
+                "Found an existing storage at {} for {}",
+                existing.root_folder.display(),
+                existing.data().profile.screen_name
+            ))
+            .subcommand_required(false)
+            .subcommand(clap::command!("sync"))
+            .subcommand(clap::command!("inspect")),
+        Err(_) => clap::Command::new(name)
+            .bin_name(name)
+            .after_help(format!(
+                "Found no existing storage at {}",
+                Config::archive_path().display()
+            ))
+            .subcommand_required(false)
+            .subcommand(clap::command!("crawl")),
+    };
 
-    ui::run_ui(storage.ok());
-
-    // println!("Storage: {}", storage_path.display());
-    // let storage = Storage::open(&storage_path);
-    // let cmd = match &storage {
-    //     Ok(existing) => clap::Command::new(name)
-    //         .bin_name(name)
-    //         .after_help(format!(
-    //             "Found an existing storage at {} for {}",
-    //             existing.root_folder.display(),
-    //             existing.data().profile.screen_name
-    //         ))
-    //         .subcommand_required(true)
-    //         .subcommand(clap::command!("sync"))
-    //         .subcommand(clap::command!("inspect"))
-    //         .subcommand(clap::command!("ui")),
-    //     Err(_) => clap::Command::new(name)
-    //         .bin_name(name)
-    //         .after_help(format!(
-    //             "Found no existing storage at {}",
-    //             Config::archive_path().display()
-    //         ))
-    //         .subcommand_required(false)
-    //         .subcommand(clap::command!("crawl"))
-    //         .subcommand(clap::command!("ui")),
-    // };
-
-    // let matches = cmd.get_matches();
-    // match (matches.subcommand(), storage) {
-    //     (Some(("crawl", _)), _) => action_crawl(&config, &storage_path).await?,
-    //     (Some(("inspect", _)), Ok(storage)) => action_inspect(&storage).await?,
-    //     (Some(("ui", _)), Ok(storage)) => action_ui(Some(storage)).await?,
-    //     (Some(("ui", _)), Err(_)) => action_ui(None).await?,
-    //     (Some(("sync", _)), Ok(storage)) => action_sync(&config, storage).await?,
-    //     _ => unreachable!("clap should ensure we don't get here"),
-    // };
+    let matches = cmd.get_matches();
+    match (matches.subcommand(), storage, config) {
+        // Try to crawl with a pre-defined config
+        (Some(("crawl", _)), Err(_), Some(config)) => action_crawl(&config, &storage_path).await?,
+        // If there's no config, perform the login dance in the terminal, then crawl
+        (Some(("crawl", _)), Err(_), None) => {
+            let config = Config::load().await.expect("Could not create config");
+            action_crawl(&config, &storage_path).await?
+        }
+        // For an existing storage, inspect it
+        (Some(("inspect", _)), Ok(storage), _) => action_inspect(&storage).await?,
+        // For an existing storage, sync it
+        (Some(("sync", _)), Ok(storage), Some(config)) => action_sync(&config, storage).await?,
+        // In all other cases, show the UI
+        (_, optional_storage, _) => action_ui(optional_storage.ok()).await?,
+    };
 
     Ok(())
 }
@@ -73,15 +76,17 @@ async fn action_crawl(config: &Config, storage_path: &Path) -> Result<()> {
 
     crawler::crawl_new_storage(config.clone(), storage_path, sender).await?;
     let storage = log_task(receiver).await??;
-    storage.save();
+    if let Err(e) = storage.save() {
+        warn!("Could not save storage {e:?}");
+    }
     action_inspect(&storage).await?;
     Ok(())
 }
 
 async fn action_sync(config: &Config, storage: Storage) -> Result<()> {
+    info!("Syncing");
     let mut config = config.clone();
     config.is_sync = true;
-    info!("Crawling");
     let (sender, receiver) = channel(256);
     crawler::crawl_into_storage(config.clone(), storage, sender).await?;
     let storage = log_task(receiver).await??;
@@ -127,12 +132,8 @@ async fn action_inspect(storage: &Storage) -> Result<()> {
     Ok(())
 }
 
-async fn action_ui(_storage: Option<Storage>) -> Result<()> {
-    // action_inspect(&storage).await?;
-    // FIXME:
-    // This will re-open the storage
-    // std::mem::drop(storage);
-    ui::run_ui(None);
+async fn action_ui(storage: Option<Storage>) -> Result<()> {
+    ui::run_ui(storage);
     Ok(())
 }
 

@@ -11,7 +11,7 @@ use reqwest::Client;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::io::Write;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use std::{
     collections::HashSet,
     path::{Path, PathBuf},
@@ -22,7 +22,6 @@ use tokio::sync::{
     mpsc::{channel, Sender},
     Mutex,
 };
-use tokio::time::Instant;
 use tracing::{info, trace, warn};
 
 use eyre::{bail, Result};
@@ -741,7 +740,7 @@ async fn fetch_tweet_replies(
             "Processing {} responses",
             search_results.response.statuses.len()
         ),
-        &message_sender,
+        message_sender,
     )
     .await;
 
@@ -857,18 +856,21 @@ fn extension_for_url(url: &str) -> String {
 async fn handle_rate_limit(limit: &RateLimit, call_info: &'static str, sender: Sender<Message>) {
     if limit.remaining <= 1 {
         let seconds = {
-            use std::time::{SystemTime, UNIX_EPOCH};
+            use std::time::UNIX_EPOCH;
             match SystemTime::now().duration_since(UNIX_EPOCH) {
                 Ok(n) => (((limit.reset as i64) - n.as_secs() as i64) + 10) as u64,
                 Err(_) => 1000,
             }
         };
         info!("Rate limit for {call_info} reached. Waiting {seconds} seconds");
-        sender
+        if let Err(e) = sender
             .send(Message::Loading(format!(
                 "Rate limit for {call_info} reached. Waiting {seconds} seconds"
             )))
-            .await;
+            .await
+        {
+            warn!("Could not send message: {e:?}");
+        }
         let wait_duration = tokio::time::Duration::from_secs(seconds);
         tokio::time::sleep(wait_duration).await;
     } else {

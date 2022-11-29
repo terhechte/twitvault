@@ -3,7 +3,7 @@
 use dioxus::prelude::*;
 
 use tokio::sync::mpsc::channel;
-use tracing::{info, warn};
+use tracing::warn;
 
 use crate::config::Config;
 
@@ -22,27 +22,22 @@ pub fn LoadingComponent(
     let appeared = cx.use_hook(|_| false);
     let message_state = use_state(&cx, || Message::Initial);
 
-    // let crawl = move |config: Config| {
     let (sender, mut receiver) = channel(4096);
     if !*appeared {
         *appeared = true;
         let cloned_config = config.clone();
         cx.spawn(async move {
-            info!("BEGIN ANOTHER CRAWL");
-            warn!("BEGIN ANOTHER CRAWL");
             let path = Config::archive_path();
             if let Err(e) = crate::crawler::crawl_new_storage(cloned_config, &path, sender).await {
                 warn!("Error {e:?}");
             }
         });
     }
-    // });
+
     let future = use_future(&cx, (), move |_| {
         let message_state = message_state.clone();
         let loading_state = loading_state.clone();
         async move {
-            info!("Enter msg loop");
-            warn!("Enter msg loop");
             while let Some(msg) = receiver.recv().await {
                 let finished = match msg {
                     Message::Finished(o) => {
@@ -60,7 +55,6 @@ pub fn LoadingComponent(
             }
         }
     });
-    // };
 
     let ui = match message_state.get() {
         Message::Error(e) => rsx!(div {

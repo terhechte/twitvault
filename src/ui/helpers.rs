@@ -1,3 +1,4 @@
+#![allow(non_snake_case)]
 use dioxus::{events::MouseEvent, prelude::*};
 
 #[inline_props]

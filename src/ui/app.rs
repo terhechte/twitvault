@@ -4,7 +4,6 @@ use std::cell::Cell;
 use dioxus::desktop::tao::dpi::LogicalSize;
 use dioxus::desktop::tao::window::WindowBuilder;
 use dioxus::prelude::*;
-use tracing::info;
 
 use crate::storage::Storage;
 
@@ -15,8 +14,6 @@ use super::setup_component::SetupComponent;
 use super::types::{LoadingState, StorageWrapper};
 
 pub fn run_ui(storage: Option<Storage>) {
-    //dioxus::desktop::launch(App);
-    // use dioxus::desktop::wry::application::window::WindowBuilder
     dioxus::desktop::launch_with_props(
         App,
         AppProps {
@@ -32,17 +29,6 @@ pub fn run_ui(storage: Option<Storage>) {
 struct AppProps {
     storage: Cell<Option<Storage>>,
 }
-
-// fn tmp_App(cx: Scope) -> Element {
-//     let loading_state = use_state(&cx, LoadingState::default);
-//     let config = crate::config::Config::open().unwrap();
-//     cx.render(rsx!(div {
-//         SetupComponent {
-//             config: config,
-//             loading_state: loading_state.clone()
-//         }
-//     }))
-// }
 
 fn App(cx: Scope<AppProps>) -> Element {
     let loading_state = use_state(&cx, LoadingState::default);
