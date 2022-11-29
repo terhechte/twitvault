@@ -8,6 +8,7 @@ env:
 jobs:
   deploy:
     runs-on: ${{ matrix.os }}
+    environment: Building
     strategy:
       matrix:
         os: [macOS-latest, windows-2019, ubuntu-latest]
