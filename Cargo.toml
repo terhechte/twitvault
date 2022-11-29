@@ -15,7 +15,7 @@ exclude = ["data", "assets", ".vscode", "icons.sketch"]
 
 [package.metadata.bundle]
 name = "Postsack"
-identifier = "com.stylemac.postsack"
+identifier = "com.stylemac.twatvault"
 icon = ["icons/Icon.icns", "icons/win-256.png", "icons/win-32.png"]
 version = "1.0.0"
 copyright = "Copyright (c) Benedikt Terhechte (2022). All rights reserved."
