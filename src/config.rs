@@ -85,12 +85,8 @@ impl Config {
 
 impl Config {
     fn keypair() -> KeyPair {
-        let consumer_key = obfstr::obfstr!(include_str!("../API_KEY"))
-            .trim()
-            .to_string();
-        let consumer_secret = obfstr::obfstr!(include_str!("../API_SECRET"))
-            .trim()
-            .to_string();
+        let consumer_key = obfstr::obfstr!(env!("API_KEY")).trim().to_string();
+        let consumer_secret = obfstr::obfstr!(env!("API_SECRET")).trim().to_string();
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }
