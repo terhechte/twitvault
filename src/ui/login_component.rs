@@ -67,7 +67,7 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
             }
         }),
         (Some(LoginStateResult::RequestData(n)), LoginState::Initial) => rsx!(Box {
-            title: "WWelcome",
+            title: "Welcome to TwatVault",
             p {
                 class: "lead",
                 "This app will archive your Twitter account, including profiles, mentions and even responses."

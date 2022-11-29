@@ -13,6 +13,8 @@ use super::main_component::MainComponent;
 use super::setup_component::SetupComponent;
 use super::types::{LoadingState, StorageWrapper};
 
+pub const TWATVAULT_ICON: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box2-heart" viewBox="0 0 16 16"><path d="M8 7.982C9.664 6.309 13.825 9.236 8 13 2.175 9.236 6.336 6.31 8 7.982Z"/><path d="M3.75 0a1 1 0 0 0-.8.4L.1 4.2a.5.5 0 0 0-.1.3V15a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V4.5a.5.5 0 0 0-.1-.3L13.05.4a1 1 0 0 0-.8-.4h-8.5Zm0 1H7.5v3h-6l2.25-3ZM8.5 4V1h3.75l2.25 3h-6ZM15 5v10H1V5h14Z"/></svg>"#;
+
 pub fn run_ui(storage: Option<Storage>) {
     dioxus::desktop::launch_with_props(
         App,
@@ -21,7 +23,7 @@ pub fn run_ui(storage: Option<Storage>) {
         },
         |c| {
             c.with_window(default_menu)
-                .with_window(|w| w.with_title("My App"))
+                .with_window(|w| w.with_title("TwatVault"))
         },
     );
 }
@@ -105,10 +107,10 @@ fn default_menu(builder: WindowBuilder) -> WindowBuilder {
     first_menu.add_native_item(MenuItem::CloseWindow);
     first_menu.add_native_item(MenuItem::Hide);
     first_menu.add_native_item(MenuItem::Quit);
-    menu_bar_menu.add_submenu("My app", true, first_menu);
+    menu_bar_menu.add_submenu("TwatVault", true, first_menu);
     let s = LogicalSize::new(1080., 775.);
     builder
-        .with_title("Twittalypse")
+        .with_title("TwatVault")
         .with_menu(menu_bar_menu)
         .with_inner_size(s)
 }
@@ -122,7 +124,7 @@ fn HeaderComponent(cx: Scope) -> Element {
                 class: "navbar-brand",
                 i {
                     class: "bi",
-                    dangerous_inner_html: r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box2-heart" viewBox="0 0 16 16"><path d="M8 7.982C9.664 6.309 13.825 9.236 8 13 2.175 9.236 6.336 6.31 8 7.982Z"/><path d="M3.75 0a1 1 0 0 0-.8.4L.1 4.2a.5.5 0 0 0-.1.3V15a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V4.5a.5.5 0 0 0-.1-.3L13.05.4a1 1 0 0 0-.8-.4h-8.5Zm0 1H7.5v3h-6l2.25-3ZM8.5 4V1h3.75l2.25 3h-6ZM15 5v10H1V5h14Z"/></svg>"#
+                    dangerous_inner_html: "{TWATVAULT_ICON}"
                 }
                 small {
                     " TwatVault"

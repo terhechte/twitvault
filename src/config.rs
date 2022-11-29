@@ -12,7 +12,7 @@ use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-const ARCHIVE_PATH: &str = "test_responses3";
+const ARCHIVE_PATH: &str = "my_archive";
 const SETTINGS_FILE: &str = "twitter_settings.json";
 const PAGING_FILE: &str = "paging_positions.json";
 
@@ -261,7 +261,7 @@ impl Default for CrawlOptions {
         Self {
             tweets: true,
             tweet_responses: false,
-            tweet_profiles: false,
+            tweet_profiles: true,
             mentions: true,
             followers: true,
             follows: true,
