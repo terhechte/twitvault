@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 futures = "0.3.25"
-egg-mode = { git = "https://github.com:terhechte/egg-mode"}
+egg-mode = { git = "https://github.com/terhechte/egg-mode"}
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 serde_json = "1.0.88"
 serde = { version = "1.0.147", features = ["derive"] }

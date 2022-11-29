@@ -663,6 +663,7 @@ checksum = "0bd4b30a6560bbd9b4620f4de34c3f14f60848e58a9b7216801afcb4c7b31c3c"
 [[package]]
 name = "egg-mode"
 version = "0.16.0"
+source = "git+https://github.com/terhechte/egg-mode#3d1bfa241d45cc9396267afaa25d0e760a1c8927"
 dependencies = [
  "base64",
  "chrono",
