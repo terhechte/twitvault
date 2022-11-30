@@ -24,7 +24,7 @@ cargo bundle --release
 
 rm target/release/bundle/osx/TwatVault.app/Contents/MacOS/twatvault
 
-mv ./twatvault ..target/release/bundle/osx/TwatVault.app/Contents/MacOS/TwatVault
+mv ./twatvault target/release/bundle/osx/TwatVault.app/Contents/MacOS/TwatVault
 
 # Tell the Info.plist or binary is capitalized
 
