@@ -64,7 +64,9 @@ async fn main() -> Result<()> {
         // For an existing storage, sync it
         (Some(("sync", _)), Ok(storage), Some(config)) => action_sync(&config, storage).await?,
         // In all other cases, show the UI
-        (_, optional_storage, _) => action_ui(optional_storage.ok()).await?,
+        (_, optional_storage, optional_config) => {
+            action_ui(optional_storage.ok(), optional_config).await?
+        }
     };
 
     Ok(())
@@ -132,8 +134,8 @@ async fn action_inspect(storage: &Storage) -> Result<()> {
     Ok(())
 }
 
-async fn action_ui(storage: Option<Storage>) -> Result<()> {
-    ui::run_ui(storage);
+async fn action_ui(storage: Option<Storage>, config: Option<Config>) -> Result<()> {
+    ui::run_ui(storage, config);
     Ok(())
 }
 

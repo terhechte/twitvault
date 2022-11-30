@@ -12,7 +12,7 @@ pub enum LoadingState {
     Login,
     Setup(Config),
     Loading(Config),
-    Loaded(StorageWrapper),
+    Loaded(StorageWrapper, Config),
 }
 
 impl PartialEq for LoadingState {
@@ -20,7 +20,7 @@ impl PartialEq for LoadingState {
         match (self, other) {
             (Self::Setup(_), Self::Setup(_)) => true,
             (Self::Loading(_), Self::Loading(_)) => true,
-            (Self::Loaded(_), Self::Loaded(_)) => true,
+            (Self::Loaded(_, _), Self::Loaded(_, _)) => true,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }

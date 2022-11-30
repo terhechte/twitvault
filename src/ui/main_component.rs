@@ -3,11 +3,12 @@
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 
+use crate::config::Config;
 use crate::storage::{List, TweetId, UserId};
 
 use super::primary_column::MainColumn;
 use super::secondary_column::SecondaryColumn;
-use super::types::StorageWrapper;
+use super::types::{LoadingState, StorageWrapper};
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum Tab {
@@ -59,7 +60,12 @@ pub fn Remainder(cx: Scope) -> Element {
 }
 
 #[inline_props]
-pub fn MainComponent(cx: Scope, storage: StorageWrapper) -> Element {
+pub fn MainComponent(
+    cx: Scope,
+    config: Config,
+    storage: StorageWrapper,
+    state: UseState<LoadingState>,
+) -> Element {
     let selected = use_state(&cx, || Tab::Tweets);
 
     let column2 = use_atom_state(&cx, COLUMN2);
@@ -92,6 +98,19 @@ pub fn MainComponent(cx: Scope, storage: StorageWrapper) -> Element {
                     NavElement {
                         label: Tab::Lists
                         selected: selected.clone()
+                    }
+                    li {
+                        button {
+                            r#type: "button",
+                            class: "btn btn-primary",
+                            style: "margin-top: 8px",
+                            onclick: move |_| state.set(LoadingState::Loading({
+                                let mut cfg = config.clone();
+                                cfg.is_sync = true;
+                                cfg
+                            })),
+                            "Sync"
+                        }
                     }
                 }
                 div {

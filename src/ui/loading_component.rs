@@ -34,6 +34,14 @@ pub fn LoadingComponent(
         });
     }
 
+    let label = if config.is_sync {
+        "Syncing..."
+    } else {
+        "Importing..."
+    };
+
+    let cloned_config = config.clone();
+
     let future = use_future(&cx, (), move |_| {
         let message_state = message_state.clone();
         let loading_state = loading_state.clone();
@@ -41,7 +49,10 @@ pub fn LoadingComponent(
             while let Some(msg) = receiver.recv().await {
                 let finished = match msg {
                     Message::Finished(o) => {
-                        loading_state.set(LoadingState::Loaded(StorageWrapper::new(o)));
+                        loading_state.set(LoadingState::Loaded(
+                            StorageWrapper::new(o),
+                            cloned_config.clone(),
+                        ));
                         true
                     }
                     other => {
@@ -71,7 +82,7 @@ pub fn LoadingComponent(
         Message::Loading(msg) => rsx!(div {
             class: "alert alert-info",
             h3 {
-                "Importing"
+                "{label}"
             }
             Spinner {
                 title: format!("{msg}")
@@ -80,7 +91,7 @@ pub fn LoadingComponent(
         Message::Initial => rsx!(div {
             class: "alert alert-info",
             h3 {
-                "Importing"
+                "{label}"
             }
         }),
     };

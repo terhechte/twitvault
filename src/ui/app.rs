@@ -5,6 +5,7 @@ use dioxus::desktop::tao::dpi::LogicalSize;
 use dioxus::desktop::tao::window::WindowBuilder;
 use dioxus::prelude::*;
 
+use crate::config::Config;
 use crate::storage::Storage;
 
 use super::loading_component::LoadingComponent;
@@ -15,11 +16,12 @@ use super::types::{LoadingState, StorageWrapper};
 
 pub const TWATVAULT_ICON: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box2-heart" viewBox="0 0 16 16"><path d="M8 7.982C9.664 6.309 13.825 9.236 8 13 2.175 9.236 6.336 6.31 8 7.982Z"/><path d="M3.75 0a1 1 0 0 0-.8.4L.1 4.2a.5.5 0 0 0-.1.3V15a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V4.5a.5.5 0 0 0-.1-.3L13.05.4a1 1 0 0 0-.8-.4h-8.5Zm0 1H7.5v3h-6l2.25-3ZM8.5 4V1h3.75l2.25 3h-6ZM15 5v10H1V5h14Z"/></svg>"#;
 
-pub fn run_ui(storage: Option<Storage>) {
+pub fn run_ui(storage: Option<Storage>, config: Option<Config>) {
     dioxus::desktop::launch_with_props(
         App,
         AppProps {
             storage: Cell::new(storage),
+            config: Cell::new(config),
         },
         |c| {
             c.with_window(default_menu)
@@ -30,27 +32,52 @@ pub fn run_ui(storage: Option<Storage>) {
 
 struct AppProps {
     storage: Cell<Option<Storage>>,
+    config: Cell<Option<Config>>,
 }
 
 fn App(cx: Scope<AppProps>) -> Element {
     let loading_state = use_state(&cx, LoadingState::default);
-    let initial = cx.props.storage.take();
-    let storage: &UseState<Option<StorageWrapper>> =
-        use_state(&cx, || initial.map(StorageWrapper::new));
-    let view = match (storage.get(), loading_state.get()) {
-        (Some(n), _) => cx.render(rsx!(div {
+
+    let storage: &UseState<Option<StorageWrapper>> = {
+        let initial = cx.props.storage.take();
+        use_state(&cx, || initial.map(StorageWrapper::new))
+    };
+
+    let config: &UseState<Option<Config>> = {
+        let initial = cx.props.config.take();
+        use_state(&cx, || initial)
+    };
+
+    let view = match (storage.get(), loading_state.get(), config.get()) {
+        (Some(n), _, Some(c)) => cx.render(rsx!(div {
             MainComponent {
-                storage: n.clone()
+                storage: n.clone(),
+                state: loading_state.clone(),
+                config: c.clone()
             }
         })),
-        (None, LoadingState::Login) => cx.render(rsx! {
+        (Some(_), _, None) => cx.render(rsx!(div {
+            class: "alert",
+            h3 {
+                "Error:"
+            }
+            p {
+                "Found storage but failed config "
+                "You may need to re-login"
+                button {
+                    class: "btn btn-primary",
+                    onclick: move |_| loading_state.set(LoadingState::default())
+                }
+            }
+        })),
+        (None, LoadingState::Login, _) => cx.render(rsx! {
             StartFlowContainer {
                 LoginComponent {
                     loading_state: loading_state.clone()
                 }
             }
         }),
-        (None, LoadingState::Setup(config)) => cx.render(rsx! {
+        (None, LoadingState::Setup(config), _) => cx.render(rsx! {
             StartFlowContainer {
                 SetupComponent {
                     config: config.clone(),
@@ -58,7 +85,7 @@ fn App(cx: Scope<AppProps>) -> Element {
                 }
             }
         }),
-        (None, LoadingState::Loading(config)) => cx.render(rsx! {
+        (None, LoadingState::Loading(config), _) => cx.render(rsx! {
             StartFlowContainer {
                 LoadingComponent {
                     config: config.clone(),
@@ -66,7 +93,8 @@ fn App(cx: Scope<AppProps>) -> Element {
                 }
             }
         }),
-        (None, LoadingState::Loaded(wrapper)) => {
+        (None, LoadingState::Loaded(wrapper, c), _) => {
+            config.set(Some(c.clone()));
             storage.set(Some(wrapper.clone()));
             cx.render(rsx! {
                 span {
