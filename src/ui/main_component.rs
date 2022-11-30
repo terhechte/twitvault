@@ -3,7 +3,7 @@
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 
-use crate::storage::{TweetId, UserId};
+use crate::storage::{List, TweetId, UserId};
 
 use super::primary_column::MainColumn;
 use super::secondary_column::SecondaryColumn;
@@ -15,6 +15,7 @@ pub enum Tab {
     Mentions,
     Followers,
     Follows,
+    Lists,
 }
 
 impl std::fmt::Display for Tab {
@@ -24,6 +25,7 @@ impl std::fmt::Display for Tab {
             Tab::Mentions => f.write_str("Mentions"),
             Tab::Followers => f.write_str("Followers"),
             Tab::Follows => f.write_str("Follows"),
+            Tab::Lists => f.write_str("Lists"),
         }
     }
 }
@@ -34,6 +36,8 @@ pub enum ColumnState {
     Responses(TweetId),
     /// A given profile
     Profile(UserId),
+    /// A list
+    List(List),
     /// Nothing in the clumn
     None,
 }
@@ -83,6 +87,10 @@ pub fn MainComponent(cx: Scope, storage: StorageWrapper) -> Element {
                     }
                     NavElement {
                         label: Tab::Followers
+                        selected: selected.clone()
+                    }
+                    NavElement {
+                        label: Tab::Lists
                         selected: selected.clone()
                     }
                 }

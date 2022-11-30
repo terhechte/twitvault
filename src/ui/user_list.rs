@@ -1,5 +1,5 @@
 #![allow(non_snake_case)]
-use std::{collections::HashMap, path::PathBuf};
+use std::{borrow::Cow, collections::HashMap, path::PathBuf};
 
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
@@ -10,7 +10,7 @@ use super::user_component::AuthorComponent;
 
 #[derive(Props)]
 pub struct AuthorListProps<'a> {
-    data: &'a [u64],
+    data: Cow<'a, [u64]>,
     media: &'a HashMap<UrlString, PathBuf>,
     profiles: &'a HashMap<u64, TwitterUser>,
     label: String,

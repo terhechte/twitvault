@@ -1,7 +1,10 @@
 #![allow(non_snake_case)]
 
+use std::borrow::Cow;
+
 use dioxus::prelude::*;
 
+use super::list_list::ListListComponent;
 use super::main_component::Tab;
 use super::tweet_list::TweetListComponent;
 use super::types::StorageWrapper;
@@ -55,7 +58,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     class: "{column_class}",
                     style: "{column_style}",
                     AuthorListComponent {
-                        data: &storage.data().follows
+                        data: Cow::Borrowed(&storage.data().follows),
                         media: &storage.data().media,
                         profiles: &storage.data().profiles,
                         label: label.clone(),
@@ -70,10 +73,21 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     class: "{column_class}",
                     style: "{column_style}",
                     AuthorListComponent {
-                        data: &storage.data().followers
+                        data: Cow::Borrowed(&storage.data().followers),
                         media: &storage.data().media,
                         profiles: &storage.data().profiles,
                         label: label.clone(),
+                    }
+                }
+            }
+        } else {rsx!{ div {}}}}
+        {if current == Tab::Lists {
+            rsx! {
+                div {
+                    class: "{column_class}",
+                    style: "{column_style}",
+                    ListListComponent {
+                        lists: &storage.data().lists
                     }
                 }
             }

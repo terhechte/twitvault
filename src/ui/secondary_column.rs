@@ -1,7 +1,11 @@
 #![allow(non_snake_case)]
 
+use std::borrow::Cow;
+
 use dioxus::fermi::{use_atom_state, AtomState};
 use dioxus::prelude::*;
+
+use crate::ui::user_list::AuthorListComponent;
 
 use super::helpers::Box;
 use super::main_component::{ColumnState, COLUMN2};
@@ -38,6 +42,22 @@ pub fn SecondaryColumn(
                         label: label,
                         user: &storage.data().profile,
                         responses: &storage.data().responses
+                    }
+                }
+            }
+        } else {rsx!{ div {} }}}
+
+        {if let ColumnState::List(ref list) = column2.current().as_ref() {
+            let label = format!("List: {}", list.name);
+            rsx!{
+                div {
+                    class: "{column_class}",
+                    style: "{column_style}",
+                    AuthorListComponent {
+                        data: Cow::Owned(list.members.clone()),
+                        media: &storage.data().media,
+                        profiles: &storage.data().profiles,
+                        label: label
                     }
                 }
             }

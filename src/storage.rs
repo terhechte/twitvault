@@ -17,6 +17,14 @@ pub struct List {
     pub members: Vec<UserId>,
 }
 
+impl PartialEq for List {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.list.id == other.list.id
+    }
+}
+
+impl Eq for List {}
+
 pub type UserId = u64;
 pub type TweetId = u64;
 pub type UrlString = String;

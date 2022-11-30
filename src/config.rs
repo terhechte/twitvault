@@ -7,12 +7,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use dotenv_codegen::dotenv;
 use egg_mode::KeyPair;
 use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-const ARCHIVE_PATH: &str = "my_archive";
+const ARCHIVE_PATH: &str = "data/xarchive";
 const SETTINGS_FILE: &str = "twitter_settings.json";
 const PAGING_FILE: &str = "paging_positions.json";
 
@@ -85,8 +86,8 @@ impl Config {
 
 impl Config {
     fn keypair() -> KeyPair {
-        let consumer_key = obfstr::obfstr!(env!("API_KEY")).trim().to_string();
-        let consumer_secret = obfstr::obfstr!(env!("API_SECRET")).trim().to_string();
+        let consumer_key = obfstr::obfstr!(dotenv!("API_KEY")).trim().to_string();
+        let consumer_secret = obfstr::obfstr!(dotenv!("API_SECRET")).trim().to_string();
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }
