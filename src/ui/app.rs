@@ -25,7 +25,7 @@ pub fn run_ui(storage: Option<Storage>, config: Option<Config>) {
         },
         |c| {
             c.with_window(default_menu)
-                .with_window(|w| w.with_title("TwatVault"))
+                .with_window(|w| w.with_title("TwitVault"))
         },
     );
 }
@@ -135,10 +135,10 @@ fn default_menu(builder: WindowBuilder) -> WindowBuilder {
     first_menu.add_native_item(MenuItem::CloseWindow);
     first_menu.add_native_item(MenuItem::Hide);
     first_menu.add_native_item(MenuItem::Quit);
-    menu_bar_menu.add_submenu("TwatVault", true, first_menu);
+    menu_bar_menu.add_submenu("TwitVault", true, first_menu);
     let s = LogicalSize::new(1080., 775.);
     builder
-        .with_title("TwatVault")
+        .with_title("TwitVault")
         .with_menu(menu_bar_menu)
         .with_inner_size(s)
 }
@@ -155,7 +155,7 @@ fn HeaderComponent(cx: Scope) -> Element {
                     dangerous_inner_html: "{TWATVAULT_ICON}"
                 }
                 small {
-                    " TwatVault"
+                    " TwitVault"
                 }
             }
         }

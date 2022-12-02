@@ -1,5 +1,5 @@
 [package]
-name = "twatvault"
+name = "twitvault"
 version = "0.1.0"
 edition = "2021"
 description = "Archive your Twitter data into a offline desktop app"
@@ -14,8 +14,8 @@ exclude = ["data", "assets", ".vscode", "icons.sketch"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [package.metadata.bundle]
-name = "TwatVault"
-identifier = "com.stylemac.twatvault"
+name = "TwitVault"
+identifier = "com.stylemac.twitvault"
 icon = ["icons/Icon.icns", "icons/win-256.png", "icons/win-32.png"]
 version = "1.0.0"
 copyright = "Copyright (c) Benedikt Terhechte (2022). All rights reserved."

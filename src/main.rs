@@ -22,7 +22,7 @@ use crate::types::Message;
 #[tokio::main]
 async fn main() -> Result<()> {
     setup_tracing();
-    let name = "TwatVault";
+    let name = "TwitVault";
     let storage_path = config::Config::archive_path();
     println!("Try opening Storage: {}", storage_path.display());
 
@@ -143,7 +143,7 @@ pub fn setup_tracing() {
     use tracing_subscriber::prelude::*;
     use tracing_subscriber::{filter::EnvFilter, fmt};
 
-    let env_filter = EnvFilter::new("hyper=info,twatvault=debug");
+    let env_filter = EnvFilter::new("hyper=info,twitvault=debug");
 
     let collector = tracing_subscriber::registry()
         .with(fmt::layer().with_writer(std::io::stdout))
