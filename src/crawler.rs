@@ -111,8 +111,10 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         }
     });
 
-    inspect_profile(
-        &shared_storage.lock().await.data().profile,
+    fetch_single_profile(
+        config.user_id(),
+        shared_storage.clone(),
+        config,
         instruction_sender.clone(),
     )
     .await?;
