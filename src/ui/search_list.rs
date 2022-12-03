@@ -1,5 +1,6 @@
 #![allow(non_snake_case)]
 
+use dioxus::events::MouseEvent;
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 
@@ -13,17 +14,17 @@ use super::types::StorageWrapper;
 #[inline_props]
 pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
     let search_term = use_state(&cx, String::new);
+
+    let filters = use_state(&cx, Options::default);
+
     let current_term = search_term.get().clone();
     let cloned = storage.clone();
+    let options = filters.get().clone();
     let search_future = use_future(&cx, (), |_| async move {
         if current_term.is_empty() {
             return None;
         }
-        Some(search(
-            current_term.clone(),
-            cloned.data(),
-            Options::default(),
-        ))
+        Some(search(current_term.clone(), cloned.data(), options))
     });
     cx.render(rsx!(div {
         div {
@@ -47,6 +48,35 @@ pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
                     spellcheck: "false",
                     name: "term",
                 }
+                div {
+                    class: "m-3",
+                    Checkbox {
+                        label: "Tweets",
+                        name: "tweets"
+                        checked: filters.tweets,
+                        onclick: move |_| filters.set(filters.get().change(|s| s.tweets = !s.tweets))
+                    }
+                    Checkbox {
+                        label: "Mentions",
+                        name: "mentions"
+                        checked: filters.mentions,
+                        onclick: move |_| filters.set(filters.get().change(|s| s.mentions = !s.mentions))
+                    }
+
+                    Checkbox {
+                        label: "Responses",
+                        name: "responses"
+                        checked: filters.profiles,
+                        onclick: move |_| filters.set(filters.get().change(|s| s.responses = !s.responses))
+                    }
+
+                    Checkbox {
+                        label: "Profiles",
+                        name: "profiles"
+                        checked: filters.profiles,
+                        onclick: move |_| filters.set(filters.get().change(|s| s.profiles = !s.profiles))
+                    }
+                }
             }
             { match search_future.value() {
                 Some(Some(v)) => rsx!(ResultListComponent {
@@ -62,6 +92,32 @@ pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
                     title: "Searching".to_string()
                 })
             }}
+        }
+    }))
+}
+
+#[inline_props]
+fn Checkbox<'a>(
+    cx: Scope,
+    label: &'static str,
+    name: &'static str,
+    checked: bool,
+    onclick: EventHandler<'a, MouseEvent>,
+) -> Element {
+    cx.render(rsx!(div {
+        class: "form-check form-check-inline",
+        input {
+            class: "form-check-input",
+            onclick: move |evt| onclick.call(evt),
+            r#type: "checkbox",
+            name: "{name}",
+            checked: "{checked}",
+            id: "{name}"
+        }
+        label {
+            class: "form-check-label",
+            r#for: "{name}",
+            "{label}"
         }
     }))
 }

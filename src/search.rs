@@ -35,6 +35,14 @@ pub struct Options {
     pub profiles: bool,
 }
 
+impl Options {
+    pub fn change(&self, action: impl Fn(&mut Self)) -> Self {
+        let mut copy = self.clone();
+        action(&mut copy);
+        copy
+    }
+}
+
 impl Default for Options {
     fn default() -> Self {
         Self {
