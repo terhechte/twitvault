@@ -41,3 +41,4 @@ dioxus = { version = "0.2.4", features = ["desktop", "fermi"] }
 obfstr = "0.4.1"
 clap = { version = "4.0.26", default_features = false, features = ["std", "help", "usage", "cargo"] }
 webbrowser = "0.6.0"
+regex = "1.7.0"

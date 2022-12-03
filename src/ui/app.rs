@@ -132,6 +132,7 @@ fn default_menu(builder: WindowBuilder) -> WindowBuilder {
     let mut first_menu = Menu::new();
     first_menu.add_native_item(MenuItem::Copy);
     first_menu.add_native_item(MenuItem::Paste);
+    first_menu.add_native_item(MenuItem::SelectAll);
     first_menu.add_native_item(MenuItem::CloseWindow);
     first_menu.add_native_item(MenuItem::Hide);
     first_menu.add_native_item(MenuItem::Quit);

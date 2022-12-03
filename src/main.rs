@@ -1,6 +1,7 @@
 mod config;
 mod crawler;
 mod helpers;
+mod search;
 mod storage;
 mod types;
 mod ui;

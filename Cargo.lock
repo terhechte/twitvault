@@ -2726,6 +2726,7 @@ dependencies = [
  "futures",
  "mime",
  "obfstr",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

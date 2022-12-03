@@ -9,6 +9,7 @@ use crate::ui::user_list::AuthorListComponent;
 
 use super::helpers::Box;
 use super::main_component::{ColumnState, COLUMN2};
+use super::tweet_component::TweetComponent;
 use super::tweet_list::TweetListComponent;
 use super::types::StorageWrapper;
 use super::user_component::AuthorComponent;
@@ -83,6 +84,38 @@ pub fn SecondaryColumn(
                         p {
                             class: "m-4",
                             "Profile for user with id  "
+                            strong {
+                                "{id} "
+                            }
+                            "not found"
+                        }
+                    }
+                }}
+            }
+        } else {rsx!{ div {} }}}
+
+        {if let ColumnState::AnyTweet(id) = column2.current().as_ref() {
+            if let Some(tweet) = storage.data().any_tweet(*id) {
+                rsx!{
+                    div {
+                        class: "{column_class}",
+                        style: "{column_style}",
+                        TweetComponent {
+                            tweet: tweet,
+                            media: &storage.data().media,
+                            user: &storage.data().profile,
+                            responses: None
+                        }
+                    }
+                }
+            } else {
+                rsx! { div {
+                    class: "p-3",
+                    Box {
+                        title: "Unknown Tweet"
+                        p {
+                            class: "m-4",
+                            "Tweet for id "
                             strong {
                                 "{id} "
                             }

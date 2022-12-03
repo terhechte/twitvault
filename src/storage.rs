@@ -54,6 +54,26 @@ pub struct Data {
     pub media: HashMap<UrlString, PathBuf>,
 }
 
+impl Data {
+    pub fn any_tweet(&self, id: TweetId) -> Option<&Tweet> {
+        for tweets in [&self.tweets, &self.mentions] {
+            for t in tweets {
+                if t.id == id {
+                    return Some(t);
+                }
+            }
+        }
+        for tweets in self.responses.values() {
+            for t in tweets {
+                if t.id == id {
+                    return Some(t);
+                }
+            }
+        }
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Storage {
     pub root_folder: PathBuf,

@@ -17,6 +17,7 @@ pub enum Tab {
     Followers,
     Follows,
     Lists,
+    Search,
 }
 
 impl std::fmt::Display for Tab {
@@ -27,12 +28,15 @@ impl std::fmt::Display for Tab {
             Tab::Followers => f.write_str("Followers"),
             Tab::Follows => f.write_str("Follows"),
             Tab::Lists => f.write_str("Lists"),
+            Tab::Search => f.write_str("Search"),
         }
     }
 }
 
 #[derive(PartialEq, Eq, Clone)]
 pub enum ColumnState {
+    /// Any kind of tweet. will search all data until it is found
+    AnyTweet(TweetId),
     /// Responses to a tweet
     Responses(TweetId),
     /// A given profile
@@ -97,6 +101,10 @@ pub fn MainComponent(
                     }
                     NavElement {
                         label: Tab::Lists
+                        selected: selected.clone()
+                    }
+                    NavElement {
+                        label: Tab::Search
                         selected: selected.clone()
                     }
                     li {

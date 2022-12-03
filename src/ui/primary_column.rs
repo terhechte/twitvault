@@ -6,6 +6,7 @@ use dioxus::prelude::*;
 
 use super::list_list::ListListComponent;
 use super::main_component::Tab;
+use super::search_list::SearchComponent;
 use super::tweet_list::TweetListComponent;
 use super::types::StorageWrapper;
 use super::user_list::AuthorListComponent;
@@ -88,6 +89,17 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     style: "{column_style}",
                     ListListComponent {
                         lists: &storage.data().lists
+                    }
+                }
+            }
+        } else {rsx!{ div {}}}}
+        {if current == Tab::Search {
+            rsx! {
+                div {
+                    class: "{column_class}",
+                    style: "{column_style}",
+                    SearchComponent {
+                        storage: storage.clone()
                     }
                 }
             }
