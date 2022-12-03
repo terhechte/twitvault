@@ -20,7 +20,9 @@ pub struct TweetListProps<'a> {
 }
 
 pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
-    let tweets_rendered = cx.props.data.iter().map(|tweet| {
+    let page_size = 100;
+    let page = use_state(&cx, || page_size);
+    let tweets_rendered = cx.props.data.iter().take(*page.get()).map(|tweet| {
         let responses = cx.props.responses.get(&tweet.id).as_ref().map(|e| e.len());
         cx.render(rsx!(TweetComponent {
             tweet: tweet,
@@ -31,8 +33,23 @@ pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
     });
 
     cx.render(rsx!(div {
+        onscroll: |evt| {
+            dbg!(evt);
+        },
         h5 { "{cx.props.label}" }
         tweets_rendered
+        div {
+            class: "d-grid gap-2",
+            button {
+                r#type: "button",
+                class: "btn btn-primary",
+                onclick: move |_| page.set(page.get() + page_size),
+                "Show More"
+            }
+        }
+        hr {
+            style: "margin-bottom: 150px;"
+        }
     }
     ))
 }

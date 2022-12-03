@@ -17,7 +17,9 @@ pub struct AuthorListProps<'a> {
 }
 
 pub fn AuthorListComponent<'a>(cx: Scope<'a, AuthorListProps>) -> Element<'a> {
-    let profiles_rendered = cx.props.data.iter().map(|id| {
+    let page_size = 100;
+    let page = use_state(&cx, || page_size);
+    let profiles_rendered = cx.props.data.iter().take(*page.get()).map(|id| {
         if let Some(user) = cx.props.profiles.get(id) {
             cx.render(rsx!(AuthorComponent {
                 profile: user,
@@ -33,6 +35,18 @@ pub fn AuthorListComponent<'a>(cx: Scope<'a, AuthorListProps>) -> Element<'a> {
     cx.render(rsx!(div {
         h5 { "{cx.props.label}" }
         profiles_rendered
+        div {
+            class: "d-grid gap-2",
+            button {
+                r#type: "button",
+                class: "btn btn-primary",
+                onclick: move |_| page.set(page.get() + page_size),
+                "Show More"
+            }
+        }
+        hr {
+            style: "margin-bottom: 150px;"
+        }
     }
     ))
 }
