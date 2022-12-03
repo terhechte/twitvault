@@ -111,13 +111,13 @@ fn App(cx: Scope<AppProps>) -> Element {
         "container"
     };
 
+    let style_html = style_html();
+
     rsx!(cx, main {
         class: "{main_class}",
-        link {
-            href: "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css",
-            rel: "stylesheet",
-            crossorigin: "anonymous"
-        },
+        div {
+            dangerous_inner_html: "{style_html}"
+        }
         is_loaded.then(|| rsx!(header {
             HeaderComponent {}
         })),
@@ -175,4 +175,12 @@ fn StartFlowContainer<'a>(cx: Scope<'a, StartFlowContainerProps<'a>>) -> Element
             &cx.props.children
         }
     ))
+}
+
+const fn style_html() -> &'static str {
+    concat!(
+        "<style>",
+        include_str!("../assets/bootstrap.min.css"),
+        "</style>"
+    )
 }
