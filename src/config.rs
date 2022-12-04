@@ -13,7 +13,7 @@ use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-const ARCHIVE_PATH: &str = "data/xarchive";
+const ARCHIVE_PATH: &str = "archive";
 const SETTINGS_FILE: &str = "twitter_settings.json";
 const PAGING_FILE: &str = "paging_positions.json";
 
