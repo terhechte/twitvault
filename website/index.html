@@ -1,0 +1,211 @@
+<html>
+
+<head>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=inter:300|archivo-black:400" rel="stylesheet" />
+</head>
+<style>
+    html,
+    body {
+        font-family: 'Inter', sans-serif;
+        margin-top: 0px;
+    }
+
+    div.container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    div.column {
+        width: 382px
+    }
+
+    div.headline {
+        text-align: center;
+        width: 382px;
+        margin-top: -60px;
+    }
+
+    div.headline h1 {
+        font-size: 50px;
+        letter-spacing: 5;
+        font-family: 'Archivo Black', sans-serif;
+    }
+
+    h2 {
+        font-size: 20px;
+        font-family: 'Archivo Black', sans-serif;
+    }
+
+    div.subline {
+        line-height: 2;
+        font-size: 18px;
+    }
+
+    .rounded {
+        border-radius: 8px;
+    }
+
+    a.btn {
+        border-radius: 8px;
+        background-color: #62A9FF;
+        border: 2px solid #0074FF;
+        color: white;
+        padding: 5px;
+        padding-left: 15px;
+        padding-right: 15px;
+        text-decoration: none;
+    }
+
+    .download-buttons {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+    }
+
+    section {
+        margin-top: 40px;
+    }
+
+    ul {
+        margin-left: 0px;
+        padding-left: 15px;
+        line-height: 2;
+        margin-bottom: 15px;
+    }
+
+    .alert {
+        padding: 5px;
+        background-color: #D1D8FF;
+        font-size: 18px;
+        border-radius: 8px;
+    }
+
+    .screenshot {
+        margin-bottom: 12px;
+    }
+</style>
+
+<body>
+    <div class="container">
+        <div class="column">
+            <img src="media/logo.png" width="382" height="275" />
+            <div class="headline">
+                <h1>TwitVault</h1>
+            </div>
+            <div class="subline">
+                <p>
+                    Easily Archive and Search Your Twitter Data with our Syncable Desktop App.
+                </p>
+            </div>
+            <div class="screenshot">
+                <a href="media/macos.jpg">
+                    <img src="media/macos.jpg" class="rounded" width="382" />
+                </a>
+            </div>
+            <section>
+                <h2>Download</h2>
+                <div class="download-buttons">
+                    <a class="btn" href="">
+                        macOS
+                    </a>
+                    <a class="btn" href="">
+                        Windows
+                    </a>
+                    <a class="btn" href="">
+                        Linux
+                    </a>
+                </div>
+            </section>
+            <section>
+                <h2>Features</h2>
+                <ul>
+                    <li>Archive your tweets.</li>
+                    <ul>
+                        <li>Optionally including respones to your tweets</li>
+                        <li>Optionally including tweet media (videos, images)</li>
+                    </ul>
+                    <li>Archive your mentions.</li>
+                    <ul>
+                        <li>Optionally including user profiles</li>
+                        <li>Optionally including profile images</li>
+                    </ul>
+                    <li>Follows and Followers</li>
+                    <ul>
+                        <li>Optionally including user profiles</li>
+                        <li>Optionally including profile images</li>
+                    </ul>
+                    <li>Your lists (the ones you created)</li>
+                    <ul>
+                        <li>Optionally including member user profiles</li>
+                        <li>Optionally including member profile images</li>
+                    </ul>
+                    <li>Search within your downloaded data <a href="media/search.jpg">(see screenshot)</a></li>
+                    <li>Sync, to download newer Tweets, mentions or responses</li>
+                    <li>Runs on macOS, Linux and Windows. Can also run in the terminal.</li>
+                </ul>
+            </section>
+            <section>
+                <h2>Limitations</h2>
+                <p>Due to API limitations, not all data can be archived. For every category, Twitter only returns a
+                    certain amount of data:</p>
+                <ul>
+                    <li>Your Tweets: max 3.200</li>
+                    <li>Your Mentions: max 800</li>
+                    <li>Follows / Followers: No idea, but at least 5000, probably more</li>
+                    <li>Lists: Max 1000, max 5000 members per list</li>
+                </ul>
+                <div class="alert">
+                    Note: I can't change the description of my API Key, so don't be confused that the app describes
+                    itself as
+                    SwiftWatch when you're authenticating with it.
+                </div>
+            </section>
+            <section>
+                <h2>Code</h2>
+                <p>
+                    The code can be found on <a href="https://github.com/terhechte/twitvault">Github</a>.
+                    It was build with <a href="https://dioxuslabs.com">Dioxus</a>, a Rust library that offers a cross
+                    platform React experience.
+                </p>
+            </section>
+            <section>
+                <h2>Screenshots</h2>
+                <h4>macOS</h4>
+                <div class="screenshot">
+                    <a href="media/macos.jpg">
+                        <img src="media/macos.jpg" class="rounded" width="382" />
+                    </a>
+                </div>
+                <div class="screenshot">
+                    <a href="media/search.jpg">
+                        <img src="media/search.jpg" class="rounded" width="382" />
+                    </a>
+                </div>
+                <h4>Linux</h4>
+                <div class="screenshot">
+                    <a href="media/linux.jpg">
+                        <img src="media/linux.jpg" class="rounded" width="382" />
+                    </a>
+                </div>
+                <h4>Windows</h4>
+                <div class="screenshot">
+                    <a href="media/windows.jpg">
+                        <img src="media/windows.jpg" class="rounded" width="382" />
+                    </a>
+                </div>
+                <h4>Terminal</h4>
+                <div class="screenshot">
+                    <a href="media/terminal.jpg">
+                        <img src="media/terminal.jpg" class="rounded" width="382" />
+                    </a>
+                </div>
+            </section>
+        </div>
+    </div>
+
+</body>
+
+</html>
