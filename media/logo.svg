@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="530px" height="530px" viewBox="0 0 530 530" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>icon_svg256w</title>
+    <defs>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-1">
+            <stop stop-color="#000000" stop-opacity="0.5" offset="0%"></stop>
+            <stop stop-color="#000000" stop-opacity="0.5" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-2">
+            <stop stop-color="#5D547B" stop-opacity="0.5" offset="0%"></stop>
+            <stop stop-color="#0D0D2E" stop-opacity="0.5" offset="100%"></stop>
+        </linearGradient>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-3">
+            <stop stop-color="#8BD3FF" offset="0%"></stop>
+            <stop stop-color="#126CA7" offset="100%"></stop>
+        </linearGradient>
+        <rect id="path-4" x="128" y="70" width="457" height="457" rx="48"></rect>
+        <filter x="-2.0%" y="-1.3%" width="103.9%" height="103.9%" filterUnits="objectBoundingBox" id="filter-5">
+            <feOffset dx="0" dy="3" in="SourceAlpha" result="shadowOffsetOuter1"></feOffset>
+            <feGaussianBlur stdDeviation="2.5" in="shadowOffsetOuter1" result="shadowBlurOuter1"></feGaussianBlur>
+            <feComposite in="shadowBlurOuter1" in2="SourceAlpha" operator="out" result="shadowBlurOuter1"></feComposite>
+            <feColorMatrix values="0 0 0 0 0   0 0 0 0 0   0 0 0 0 0  0 0 0 0.5 0" type="matrix" in="shadowBlurOuter1"></feColorMatrix>
+        </filter>
+        <linearGradient x1="50%" y1="0%" x2="50%" y2="100%" id="linearGradient-6">
+            <stop stop-color="#FFFFFF" stop-opacity="0.329163024" offset="0%"></stop>
+            <stop stop-color="#000000" stop-opacity="0.246503497" offset="100%"></stop>
+        </linearGradient>
+        <path d="M75,0 C68.7048539,0 62.7770876,2.96388315 59,8 L2,84 C0.701778719,85.7309617 0,87.8362979 0,90 L0,300 C0,311.045695 8.954305,320 20,320 L300,320 C311.045695,320 320,311.045695 320,300 L320,90 C320,87.8362979 319.298221,85.7309617 318,84 L261,8 C257.222912,2.96388315 251.295146,0 245,0 L75,0 Z M75,20 L150,20 L150,80 L30,80 L75,20 Z M170,80 L170,20 L245,20 L290,80 L170,80 Z M300,100 L300,300 L20,300 L20,100 L300,100 Z" id="path-7"></path>
+    </defs>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Mac-Logo" transform="translate(-87.000000, -34.000000)">
+            <g id="Rectangle">
+                <use fill="black" fill-opacity="1" filter="url(#filter-5)" xlink:href="#path-4"></use>
+                <use fill="#514656" fill-rule="evenodd" xlink:href="#path-4"></use>
+                <use fill-opacity="0.7" fill="url(#linearGradient-1)" fill-rule="evenodd" xlink:href="#path-4"></use>
+                <rect stroke="url(#linearGradient-3)" stroke-width="14" stroke-linejoin="square" fill-opacity="0.6" fill="url(#linearGradient-2)" fill-rule="evenodd" x="135" y="77" width="443" height="443" rx="48"></rect>
+            </g>
+            <g id="box2-heart" transform="translate(204.000000, 147.000000)" fill-rule="nonzero">
+                <path d="M160,159.64 C193.28,126.18 276.5,184.72 160,260 C43.5,184.72 126.72,126.2 160,159.64 Z" id="Path" fill="#FFFFFF"></path>
+                <g id="Shape">
+                    <use fill="#32C5FF" xlink:href="#path-7"></use>
+                    <use fill="url(#linearGradient-6)" xlink:href="#path-7"></use>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>
