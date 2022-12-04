@@ -626,32 +626,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bd0c93bb4b0c6d9b77f4435b0ae98c24d17f1c45b2ff844c6151a07256ca923b"
 
 [[package]]
-name = "dotenv"
-version = "0.15.0"
+name = "dotenvy"
+version = "0.15.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
+checksum = "03d8c417d7a8cb362e0c37e5d815f5eb7c37f79ff93707329d5a194e42e54ca0"
 
 [[package]]
-name = "dotenv_codegen"
-version = "0.15.0"
+name = "dotenvy_codegen_impl"
+version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56966279c10e4f8ee8c22123a15ed74e7c8150b658b26c619c53f4a56eb4a8aa"
+checksum = "e05611d49f33180c6989e426b1d63a5ac0651307f0459321b67b38cd9861d050"
 dependencies = [
- "dotenv_codegen_implementation",
- "proc-macro-hack",
-]
-
-[[package]]
-name = "dotenv_codegen_implementation"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "53e737a3522cd45f6adc19b644ce43ef53e1e9045f2d2de425c1f468abd4cf33"
-dependencies = [
- "dotenv",
+ "dotenvy",
  "proc-macro-hack",
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "dotenvy_macro"
+version = "0.15.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f559fff643c8f40279ab9bc50dd3734c22efc1f386972995f52892fe414722a7"
+dependencies = [
+ "dotenvy_codegen_impl",
+ "proc-macro-hack",
 ]
 
 [[package]]
@@ -2719,8 +2719,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "dioxus",
- "dotenv",
- "dotenv_codegen",
+ "dotenvy_macro",
  "egg-mode",
  "eyre",
  "futures",

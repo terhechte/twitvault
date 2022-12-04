@@ -7,7 +7,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use dotenv_codegen::dotenv;
+use dotenvy_macro::dotenv;
 use egg_mode::KeyPair;
 use eyre::{bail, Result};
 use serde::{Deserialize, Serialize};
@@ -88,8 +88,8 @@ impl Config {
     fn keypair() -> KeyPair {
         // somehow dotenv doesn't behave as expected. need to look into it:
         // https://github.com/dotenv-rs/dotenv/issues/71
-        let consumer_key = obfstr::obfstr!(env!("API_KEY")).trim().to_string();
-        let consumer_secret = obfstr::obfstr!(env!("API_SECRET")).trim().to_string();
+        let consumer_key = obfstr::obfstr!(dotenv!("API_KEY")).trim().to_string();
+        let consumer_secret = obfstr::obfstr!(dotenv!("API_SECRET")).trim().to_string();
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }
