@@ -86,3 +86,32 @@ pub fn Checkbox<'a>(cx: Scope<'a, CheckboxProps<'a>>) -> Element {
         }
     ))
 }
+
+#[derive(Props)]
+pub struct ShowMoreButtonProps<'a> {
+    pub visible: bool,
+    pub onclick: EventHandler<'a, MouseEvent>,
+}
+
+pub fn ShowMoreButton<'a>(cx: Scope<'a, ShowMoreButtonProps<'a>>) -> Element<'a> {
+    if cx.props.visible {
+        cx.render(rsx!( div {
+            class: "d-grid gap-2",
+            button {
+                r#type: "button",
+                class: "btn btn-primary",
+                onclick: |n| cx.props.onclick.call(n),
+                "Show More"
+            }
+        }
+        ))
+    } else {
+        cx.render(rsx!(div {}))
+    }
+}
+
+pub fn BottomSpacer(cx: Scope) -> Element {
+    cx.render(rsx!(hr {
+        style: "margin-bottom: 150px;"
+    }))
+}
