@@ -201,7 +201,7 @@ async fn fetch_user_tweets(
 ) -> Result<()> {
     let label = "User Tweets";
     msg(label, &message_sender).await;
-    let mut timeline = tweet::user_timeline(id, true, true, &config.token).with_page_size(50);
+    let mut timeline = tweet::user_timeline(id, true, true, &config.token).with_page_size(200);
 
     let mut first_page = config.paging_position("user_tweets");
 
@@ -265,7 +265,7 @@ async fn fetch_user_mentions(
 ) -> Result<()> {
     let label = "User Mentions";
     msg(label, &message_sender).await;
-    let mut timeline = tweet::mentions_timeline(&config.token).with_page_size(50);
+    let mut timeline = tweet::mentions_timeline(&config.token).with_page_size(200);
 
     let mut first_page = config.paging_position("user_mentions");
 
@@ -331,7 +331,7 @@ async fn fetch_user_followers(
     let followers = { shared_storage.lock().await.data().followers.clone() };
     let ids = fetch_profiles_ids(
         "Followers",
-        user::followers_ids(id, &config.token).with_page_size(50),
+        user::followers_ids(id, &config.token).with_page_size(4000),
         shared_storage.clone(),
         config,
         sender,
@@ -353,7 +353,7 @@ async fn fetch_user_follows(
     let follows = { shared_storage.lock().await.data().follows.clone() };
     let ids = fetch_profiles_ids(
         "Follows",
-        user::friends_ids(id, &config.token).with_page_size(50),
+        user::friends_ids(id, &config.token).with_page_size(4000),
         shared_storage.clone(),
         config,
         sender,
