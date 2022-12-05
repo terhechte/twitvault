@@ -86,10 +86,10 @@ impl Config {
 
 impl Config {
     fn keypair() -> KeyPair {
-        // somehow dotenv doesn't behave as expected. need to look into it:
+        // somehow dotenv and dotenvy doesn't behave as expected. need to look into it:
         // https://github.com/dotenv-rs/dotenv/issues/71
-        let consumer_key = obfstr::obfstr!(dotenv!("API_KEY")).trim().to_string();
-        let consumer_secret = obfstr::obfstr!(dotenv!("API_SECRET")).trim().to_string();
+        let consumer_key = obfstr::obfstr!(env!("API_KEY")).trim().to_string();
+        let consumer_secret = obfstr::obfstr!(env!("API_SECRET")).trim().to_string();
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }
