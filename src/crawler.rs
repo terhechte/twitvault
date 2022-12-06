@@ -22,6 +22,7 @@ use tokio::sync::{
     mpsc::{channel, Sender},
     Mutex,
 };
+use tokio::task::JoinHandle;
 use tracing::{info, trace, warn};
 
 use eyre::{bail, Result};
@@ -74,6 +75,28 @@ pub async fn crawl_into_storage(
     Ok(())
 }
 
+pub fn create_instruction_handler(
+    should_download_media: bool,
+    shared_storage: Arc<Mutex<Storage>>,
+) -> (JoinHandle<()>, Sender<DownloadInstruction>) {
+    let (instruction_sender, mut instruction_receiver) = channel(4096);
+    let instruction_task = tokio::spawn(async move {
+        let client = Client::new();
+        while let Some(instruction) = instruction_receiver.recv().await {
+            if matches!(instruction, DownloadInstruction::Done) {
+                break;
+            }
+            if !should_download_media {
+                continue;
+            }
+            if let Err(e) = handle_instruction(&client, instruction, shared_storage.clone()).await {
+                warn!("Download Error {e:?}");
+            }
+        }
+    });
+    (instruction_task, instruction_sender)
+}
+
 async fn msg(msg: impl AsRef<str>, sender: &Sender<Message>) {
     if let Err(e) = sender
         .send(Message::Loading(msg.as_ref().to_string()))
@@ -93,23 +116,8 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         }
     }
 
-    let (instruction_sender, mut instruction_receiver) = channel(4096);
-    let cloned_storage = shared_storage.clone();
-    let download_media = config.crawl_options().media;
-    let instruction_task = tokio::spawn(async move {
-        let client = Client::new();
-        while let Some(instruction) = instruction_receiver.recv().await {
-            if matches!(instruction, DownloadInstruction::Done) {
-                break;
-            }
-            if !download_media {
-                continue;
-            }
-            if let Err(e) = handle_instruction(&client, instruction, cloned_storage.clone()).await {
-                warn!("Download Error {e:?}");
-            }
-        }
-    });
+    let (instruction_task, instruction_sender) =
+        create_instruction_handler(config.crawl_options().media, shared_storage.clone());
 
     fetch_single_profile(
         config.user_id(),
@@ -238,11 +246,6 @@ async fn fetch_user_tweets(
         config.set_paging_position("user_tweets", timeline.min_id);
 
         msg(format!("{label}: {}", collected.len()), &message_sender).await;
-
-        // If we get less than we have, stop it
-        if collected.len() > 200 {
-            break;
-        }
     }
 
     let mut s = shared_storage.lock().await;
@@ -331,7 +334,7 @@ async fn fetch_user_followers(
     let followers = { shared_storage.lock().await.data().followers.clone() };
     let ids = fetch_profiles_ids(
         "Followers",
-        user::followers_ids(id, &config.token).with_page_size(4000),
+        user::followers_ids(id, &config.token).with_page_size(100),
         shared_storage.clone(),
         config,
         sender,
@@ -353,7 +356,7 @@ async fn fetch_user_follows(
     let follows = { shared_storage.lock().await.data().follows.clone() };
     let ids = fetch_profiles_ids(
         "Follows",
-        user::friends_ids(id, &config.token).with_page_size(4000),
+        user::friends_ids(id, &config.token).with_page_size(100),
         shared_storage.clone(),
         config,
         sender,
@@ -483,7 +486,7 @@ async fn fetch_lists(
 ) -> Result<()> {
     let label = "Lists";
     msg(label, &message_sender).await;
-    let mut cursor = list::ownerships(id, &config.token).with_page_size(500);
+    let mut cursor = list::ownerships(id, &config.token).with_page_size(100);
     cursor.next_cursor = config
         .paging_position("lists")
         .map(|e| e as i64)
@@ -558,7 +561,7 @@ async fn fetch_list_members(
     }
 
     let list_id = ListID::from_id(list.id);
-    let mut cursor = list::members(list_id, &config.token).with_page_size(2000);
+    let mut cursor = list::members(list_id, &config.token).with_page_size(100);
     let paging_key = format!("list-{}", list.id);
     cursor.next_cursor = config
         .paging_position(&paging_key)
@@ -651,7 +654,7 @@ async fn fetch_single_profile(
     Ok(())
 }
 
-async fn inspect_tweet(
+pub async fn inspect_tweet(
     tweet: &Tweet,
     storage: Arc<Mutex<Storage>>,
     config: &Config,

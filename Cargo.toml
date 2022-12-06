@@ -17,11 +17,12 @@ exclude = ["data", "assets", ".vscode", "icons.sketch"]
 name = "TwitVault"
 identifier = "com.stylemac.twitvault"
 icon = ["icons/Icon.icns", "icons/win-256.png", "icons/win-32.png"]
-version = "1.0.0"
+version = "0.1.0"
 copyright = "Copyright (c) Benedikt Terhechte (2022). All rights reserved."
 category = "Social Network"
 short_description = "Archive your Twitter data into a offline desktop app"
 osx_minimum_system_version = "10.12"
+deb_depends = "libwebkit2gtk-4.0-dev libgtk-3-dev libayatana-appindicator3-dev libsoup2.4-dev"
 
 [dependencies]
 futures = "0.3.25"
@@ -41,3 +42,4 @@ obfstr = "0.4.1"
 clap = { version = "4.0.26", default_features = false, features = ["std", "help", "usage", "cargo"] }
 webbrowser = "0.6.0"
 regex = "1.7.0"
+chrono = "0.4.23"

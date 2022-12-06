@@ -1,12 +1,14 @@
 mod config;
 mod crawler;
 mod helpers;
+mod importer;
 mod search;
 mod storage;
 mod types;
 mod ui;
 
-use eyre::Result;
+use clap::{ArgMatches, Command};
+use eyre::{bail, Result};
 use tokio::{
     sync::mpsc::{channel, Receiver},
     task::JoinHandle,
@@ -40,6 +42,10 @@ async fn main() -> Result<()> {
             ))
             .subcommand_required(false)
             .subcommand(clap::command!("sync"))
+            .subcommand(
+                Command::new("import")
+                    .arg(clap::Arg::new("archive-path").required(true).short('c')),
+            )
             .subcommand(clap::command!("inspect")),
         Err(_) => clap::Command::new(name)
             .bin_name(name)
@@ -60,6 +66,10 @@ async fn main() -> Result<()> {
             let config = Config::load().await.expect("Could not create config");
             action_crawl(&config, &storage_path).await?
         }
+        // Import a Twitter archive
+        (Some(("import", archive)), Ok(storage), Some(config)) => {
+            action_import(&config, storage, archive).await?
+        }
         // For an existing storage, inspect it
         (Some(("inspect", _)), Ok(storage), _) => action_inspect(&storage).await?,
         // For an existing storage, sync it
@@ -70,6 +80,16 @@ async fn main() -> Result<()> {
         }
     };
 
+    Ok(())
+}
+
+async fn action_import(config: &Config, storage: Storage, matches: &ArgMatches) -> Result<()> {
+    let Some(path) = matches.get_one::<String>("archive-path") else {
+        bail!("Missing parameter --archive-path [...]")
+    };
+    let storage = importer::import_archive(storage, config, path).await?;
+    storage.save()?;
+    action_inspect(&storage).await?;
     Ok(())
 }
 
