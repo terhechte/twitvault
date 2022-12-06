@@ -4,7 +4,12 @@
 
 ## Easily Archive and Search Your Twitter Data with our Syncable Desktop App
 
-![macOS Screenshot](media/macos.jpg)
+<img src="website/media/macos.jpg" width="450" />
+
+TwitVault is a cross platform desktop app that uses the Twitter api to download
+your profile data. It can also sync your profile to retrieve new data (with some limitations) and
+it can import some data from the official Twitter archives. You can then browse and search
+your offline Twitter data from the convenience of a native (well, partially native) deskop app.
 
 ### Features
 
@@ -78,19 +83,19 @@ Afterwards, you can start TwitVault again and it will contain the Tweets.
 
 Search:
 
-![Search Screenshot](media/search.jpg)
+![Search Screenshot](website/media/search.jpg)
 
 Linux:
 
-![Linux Screenshot](media/linux.jpg)
+![Linux Screenshot](website/media/linux.jpg)
 
 Windows:
 
-![Windows Screenshot](media/windows.jpg)
+![Windows Screenshot](website/media/windows.jpg)
 
 Terminal:
 
-![Terminal Screenshot](media/terminal.jpg)
+![Terminal Screenshot](website/media/terminal.jpg)
 
 ### Where is my data stored?
 
