@@ -86,6 +86,15 @@
     .screenshot {
         margin-bottom: 12px;
     }
+
+    .code {
+        margin-top: 16px;
+        padding: 5px;
+        background-color: #efefef;
+        font-size: 14px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
 </style>
 
 <body>
@@ -108,13 +117,15 @@
             <section>
                 <h2>Download</h2>
                 <div class="download-buttons">
-                    <a class="btn" href="">
+                    <a class="btn"
+                        href="https://github.com/terhechte/twitvault/releases/download/0.1.0/TwitVault.app.zip">
                         macOS
                     </a>
-                    <a class="btn" href="">
+                    <a class="btn"
+                        href="https://github.com/terhechte/twitvault/releases/download/0.1.0/TwitVault.exe.zip">
                         Windows
                     </a>
-                    <a class="btn" href="">
+                    <a class="btn" href="#installation">
                         Linux
                     </a>
                 </div>
@@ -122,6 +133,7 @@
             <section>
                 <h2>Features</h2>
                 <ul>
+                    <li>Import Tweets from an existing Twitter archive (see below)</li>
                     <li>Archive your tweets.</li>
                     <ul>
                         <li>Optionally including respones to your tweets</li>
@@ -143,12 +155,20 @@
                         <li>Optionally including member profile images</li>
                     </ul>
                     <li>Search within your downloaded data <a href="media/search.jpg">(see screenshot)</a></li>
+                    <li>See your Tweets reverse chronological beginning with your first Tweets.</li>
                     <li>Sync, to download newer Tweets, mentions or responses</li>
                     <li>Runs on macOS, Linux and Windows. Can also run in the terminal.</li>
+                    <li>Probably has a healthy set of bugs</li>
                 </ul>
             </section>
             <section>
                 <h2>Limitations</h2>
+
+                <p>
+                    Known Issue: The Windows version curently doesn't display media / images. They're being downloaded
+                    though.
+                </p>
+
                 <p>Due to API limitations, not all data can be archived. For every category, Twitter only returns a
                     certain amount of data:</p>
                 <ul>
@@ -202,6 +222,69 @@
                         <img src="media/terminal.jpg" class="rounded" width="382" />
                     </a>
                 </div>
+            </section>
+            <section>
+                <h2><a id="installation">Installation</a></h2>
+                Requires <a href="https://www.rust-lang.org">Rust</a>:
+                <div class="code">
+                    <pre>
+cargo build --release
+                    </pre>
+                </div>
+                <p>
+                    You will also need a valid Twitter API Key. Which has to be set in your shell environment.
+                </p>
+            </section>
+            <section>
+                <h2><a id="installation">Importing from an existing Archive</a></h2>
+                <p>
+                    If you already downloaded an existing Twitter Archive, you can use it to fill up any missing Tweets
+                    in your TwitVault import.
+                </p>
+                <p>
+                    First, perform a normal TwitVault backup.
+                </p>
+                <p>
+                    Once the backup is done, exit TwitVault, head to the Terminal, and execute the following command:
+                </p>
+                <div class="code">
+                    <pre>
+twitvault import -c ~/twitter-archive-folder
+
+# or on macOS
+cd /Applications/TwitVault.app/Contents/MacOS/
+./TwitVault import -c ~/Path/To/twitter-archive-folder
+/Applications/TwitVault.app/Contents/MacOS/TwitVault import -c ~/Path/To/twitter-archive-folder
+                    </pre>
+                </div>
+                <p>
+                    Afterwards, you can start TwitVault again and it will contain the Tweets.
+                </p>
+            </section>
+            <section>
+                <h2>Where is my data stored?</h2>
+                The location of your data depends on your operating system:
+                <ul>
+                    <li>Linux:
+                        <pre>/home/username/.config/twitvault</pre>
+                    </li>
+                    <li>Windows:
+                        <pre>C:\Users\Username\AppData\Roaming\StyleMac\TwitVault\config</pre>
+                    </li>
+                    <li>macOS:
+                        <pre>/Users/username/Application Support/com.StyleMac.TwitVault</pre>
+                    </li>
+                </ul>
+                <p>Testing these kinds of things under three different operating systems is kinda hard. So there might
+                    be
+                    bugs.</p>
+            </section>
+            <section>
+                <p>2022++ Benedikt Terhechte</p>
+                <p><a href="https://twitter.com/terhechte">@twitter</a>
+                    <a href="https://mastodon.social/@terhechte">@mastodon.social</a>
+                    <a href="https://github.com/terhechte">@github</a>
+                </p>
             </section>
         </div>
     </div>

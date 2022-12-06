@@ -165,11 +165,7 @@ pub struct MediaResolver<'a> {
 impl<'a> MediaResolver<'a> {
     pub fn resolve(&self, url: &str) -> Option<String> {
         let found = self.media.get(url)?;
-        // Some(format!("file://{found}"))
         let path = self.root_folder.join(found);
-        //Some(dbg!(format!("file://{}", path.display())))
         Some(path.display().to_string())
-        // Some(dbg!(format!("{}", )))
-        // Some(dbg!(path))
     }
 }
