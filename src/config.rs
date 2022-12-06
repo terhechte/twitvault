@@ -41,8 +41,12 @@ impl PartialEq for Config {
 impl Eq for Config {}
 
 impl Config {
-    pub fn archive_path() -> PathBuf {
-        PathBuf::from_str(ARCHIVE_PATH).unwrap()
+    pub fn storage_path() -> PathBuf {
+        data_directory().join(ARCHIVE_PATH)
+    }
+
+    pub fn config_path() -> PathBuf {
+        data_directory().join(SETTINGS_FILE)
     }
 
     pub fn screen_name(&self) -> &str {
@@ -97,7 +101,8 @@ impl Config {
         let con_token = Self::keypair();
 
         let (token, config_data, paging_positions) = {
-            let fp = std::fs::File::open(SETTINGS_FILE)?;
+            let path = Config::config_path();
+            let fp = std::fs::File::open(path)?;
             let config_data: ConfigData = serde_json::from_reader(fp)?;
             let paging_positions: PagingPositions = std::fs::File::open(PAGING_FILE)
                 .map_err(|e| eyre::eyre!("{e:?}"))
@@ -143,7 +148,8 @@ impl Config {
                 println!("We've hit an error using your old tokens: {:?}", err);
                 println!("We'll have to reauthenticate before continuing.");
                 println!("Last Paging Positions");
-                std::fs::remove_file(SETTINGS_FILE).unwrap();
+                let path = Config::config_path();
+                std::fs::remove_file(path).unwrap();
                 bail!("Please Relogin")
             } else {
                 println!("Logged in as {}", config.config_data.username);
@@ -272,8 +278,18 @@ impl Default for CrawlOptions {
 
 impl ConfigData {
     fn write(&self) -> Result<()> {
-        let f = std::fs::File::create(SETTINGS_FILE)?;
+        let path = Config::config_path();
+        let f = std::fs::File::create(&path)?;
         serde_json::to_writer(f, &self)?;
         Ok(())
+    }
+}
+
+fn data_directory() -> PathBuf {
+    use directories_next::ProjectDirs;
+    if let Some(proj_dirs) = ProjectDirs::from("com", "StyleMac", "TwitVault") {
+        proj_dirs.config_dir().to_path_buf()
+    } else {
+        panic!("Couldn't find a folder to save the data")
     }
 }

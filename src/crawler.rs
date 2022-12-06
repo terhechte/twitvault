@@ -817,7 +817,7 @@ async fn handle_instruction(
         DownloadInstruction::ProfileMedia(url) => (extension_for_url(&url), url),
         _ => return Ok(()),
     };
-    let path = {
+    let (absolute_path, relative_path) = {
         let storage = shared_storage.lock().await;
         if storage.data().media.contains_key(&url) {
             return Ok(());
@@ -825,10 +825,10 @@ async fn handle_instruction(
         let mut hasher = DefaultHasher::new();
         hasher.write(url.as_bytes());
         let file_name = format!("{}.{extension}", hasher.finish());
-        storage.media_path(&file_name)
+        (storage.media_path(&file_name), file_name)
     };
 
-    let mut fp = std::fs::File::create(&path)?;
+    let mut fp = std::fs::File::create(&absolute_path)?;
 
     let bytes = client.get(&url).send().await?.bytes().await?;
 
@@ -839,7 +839,7 @@ async fn handle_instruction(
         .await
         .data_mut()
         .media
-        .insert(url, path);
+        .insert(url, relative_path);
 
     Ok(())
 }

@@ -1,10 +1,10 @@
 #![allow(non_snake_case)]
-use std::{borrow::Cow, collections::HashMap, path::PathBuf};
+use std::{borrow::Cow, collections::HashMap};
 
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
-use crate::storage::UrlString;
+use crate::storage::MediaResolver;
 
 use super::helpers::{BottomSpacer, ShowMoreButton};
 use super::user_component::AuthorComponent;
@@ -12,7 +12,7 @@ use super::user_component::AuthorComponent;
 #[derive(Props)]
 pub struct AuthorListProps<'a> {
     data: Cow<'a, [u64]>,
-    media: &'a HashMap<UrlString, PathBuf>,
+    media: MediaResolver<'a>,
     profiles: &'a HashMap<u64, TwitterUser>,
     label: String,
 }
@@ -25,7 +25,7 @@ pub fn AuthorListComponent<'a>(cx: Scope<'a, AuthorListProps>) -> Element<'a> {
         if let Some(user) = cx.props.profiles.get(id) {
             cx.render(rsx!(AuthorComponent {
                 profile: user,
-                media: cx.props.media,
+                media: cx.props.media.clone(),
             }))
         } else {
             cx.render(rsx!(div {

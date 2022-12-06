@@ -1,11 +1,10 @@
 #![allow(non_snake_case)]
-use std::{collections::HashMap, path::PathBuf};
 
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
-use crate::storage::UrlString;
+use crate::storage::MediaResolver;
 
 use super::main_component::{ColumnState, COLUMN2};
 use super::tweet_component::TweetComponent;
@@ -13,7 +12,7 @@ use super::tweet_component::TweetComponent;
 #[derive(Props)]
 pub struct AuthorProps<'a> {
     profile: &'a TwitterUser,
-    media: &'a HashMap<UrlString, PathBuf>,
+    media: MediaResolver<'a>,
 }
 
 pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
@@ -81,7 +80,7 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
             rsx!(div {
                 TweetComponent {
                     tweet: quoted,
-                    media: cx.props.media,
+                    media: cx.props.media.clone(),
                     user: cx.props.profile
                     responses: None
                 }
@@ -97,7 +96,7 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
                 class: "col-1 g-0",
                 AuthorImageComponent {
                     profile: author,
-                    media: cx.props.media
+                    media: cx.props.media.clone()
                 }
             }
             div {
@@ -123,18 +122,13 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
 #[derive(Props)]
 pub struct AuthorImageProps<'a> {
     profile: &'a TwitterUser,
-    media: &'a HashMap<UrlString, PathBuf>,
+    media: MediaResolver<'a>,
 }
 
 pub fn AuthorImageComponent<'a>(cx: Scope<'a, AuthorImageProps>) -> Element<'a> {
     let column2 = use_atom_state(&cx, COLUMN2);
     let url = &cx.props.profile.profile_image_url_https;
-    let ref_url = cx
-        .props
-        .media
-        .get(url)
-        .map(|entry| entry.display().to_string())
-        .unwrap_or_else(|| url.clone());
+    let ref_url = cx.props.media.resolve(url).unwrap_or_else(|| url.clone());
 
     cx.render(rsx!(
         div {

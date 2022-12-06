@@ -1,12 +1,11 @@
 #![allow(non_snake_case)]
-use std::{collections::HashMap, path::PathBuf};
 
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
 use crate::crawler::DownloadInstruction;
-use crate::storage::UrlString;
+use crate::storage::MediaResolver;
 
 use egg_mode::tweet::Tweet;
 
@@ -16,7 +15,7 @@ use super::user_component::AuthorImageComponent;
 #[derive(Props)]
 pub struct TweetProps<'a> {
     tweet: &'a Tweet,
-    media: &'a HashMap<UrlString, PathBuf>,
+    media: MediaResolver<'a>,
     user: &'a TwitterUser,
     responses: Option<Option<usize>>,
 }
@@ -40,8 +39,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
         .map(|entry| {
             cx.props
                 .media
-                .get(&entry)
-                .map(|path| path.display().to_string())
+                .resolve(&entry)
                 .unwrap_or_else(|| entry.clone())
         })
         .map(|entry| {
@@ -62,8 +60,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
         .map(|entry| {
             cx.props
                 .media
-                .get(&entry)
-                .map(|path| path.display().to_string())
+                .resolve(&entry)
                 .unwrap_or_else(|| entry.clone())
         })
         .map(|entry| {
@@ -87,7 +84,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
         .map(|user| {
             rsx!(AuthorImageComponent {
                 profile: user,
-                media: cx.props.media
+                media: cx.props.media.clone()
             })
         })
         .unwrap_or_else(|| rsx!(div {}));
@@ -149,7 +146,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
             rsx!(div {
                 TweetComponent {
                     tweet: quoted,
-                    media: cx.props.media,
+                    media: cx.props.media.clone(),
                     user: cx.props.user
                     responses: None
                 }

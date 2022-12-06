@@ -27,7 +27,7 @@ pub fn LoadingComponent(
         *appeared = true;
         let cloned_config = config.clone();
         cx.spawn(async move {
-            let path = Config::archive_path();
+            let path = Config::storage_path();
             if let Err(e) = crate::crawler::crawl_new_storage(cloned_config, &path, sender).await {
                 warn!("Error {e:?}");
             }

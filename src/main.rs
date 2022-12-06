@@ -26,7 +26,11 @@ use crate::types::Message;
 async fn main() -> Result<()> {
     setup_tracing();
     let name = "TwitVault";
-    let storage_path = config::Config::archive_path();
+    let storage_path = config::Config::storage_path();
+    if !storage_path.exists() {
+        std::fs::create_dir_all(&storage_path)
+            .expect("Expect to be able to create the data directory");
+    }
     println!("Try opening Storage: {}", storage_path.display());
 
     let config = config::Config::open().ok();
@@ -51,7 +55,7 @@ async fn main() -> Result<()> {
             .bin_name(name)
             .after_help(format!(
                 "Found no existing storage at {}",
-                Config::archive_path().display()
+                Config::storage_path().display()
             ))
             .subcommand_required(false)
             .subcommand(clap::command!("crawl")),

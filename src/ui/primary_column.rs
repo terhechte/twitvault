@@ -28,7 +28,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     style: "{column_style}",
                     TweetListComponent {
                         data: &storage.data().tweets,
-                        media: &storage.data().media,
+                        media: storage.resolver(),
                         label: label,
                         user: &storage.data().profile,
                         responses: &storage.data().responses
@@ -44,7 +44,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     style: "{column_style}",
                     TweetListComponent {
                         data: &storage.data().mentions,
-                        media: &storage.data().media,
+                        media: storage.resolver(),
                         label: label.clone(),
                         user: &storage.data().profile,
                         responses: &storage.data().responses
@@ -60,7 +60,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     style: "{column_style}",
                     AuthorListComponent {
                         data: Cow::Borrowed(&storage.data().follows),
-                        media: &storage.data().media,
+                        media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label.clone(),
                     }
@@ -75,7 +75,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                     style: "{column_style}",
                     AuthorListComponent {
                         data: Cow::Borrowed(&storage.data().followers),
-                        media: &storage.data().media,
+                        media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label.clone(),
                     }

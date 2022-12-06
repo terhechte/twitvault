@@ -39,7 +39,7 @@ pub fn SecondaryColumn(
                     style: "{column_style}",
                     TweetListComponent {
                         data: storage.data().responses.get(id).unwrap_or(&storage.empty_tweets),
-                        media: &storage.data().media,
+                        media: storage.resolver(),
                         label: label,
                         user: &storage.data().profile,
                         responses: &storage.data().responses
@@ -56,7 +56,7 @@ pub fn SecondaryColumn(
                     style: "{column_style}",
                     AuthorListComponent {
                         data: Cow::Owned(list.members.clone()),
-                        media: &storage.data().media,
+                        media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label
                     }
@@ -72,7 +72,7 @@ pub fn SecondaryColumn(
                         style: "{column_style}",
                         AuthorComponent {
                             profile: profile,
-                            media: &storage.data().media
+                            media: storage.resolver()
                         }
                     }
                 }
@@ -102,7 +102,7 @@ pub fn SecondaryColumn(
                         style: "{column_style}",
                         TweetComponent {
                             tweet: tweet,
-                            media: &storage.data().media,
+                            media: storage.resolver(),
                             user: &storage.data().profile,
                             responses: None
                         }

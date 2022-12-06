@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::config::Config;
 
-use crate::storage::{Data, Storage};
+use crate::storage::{Data, MediaResolver, Storage};
 
 use egg_mode::tweet::Tweet;
 
@@ -44,6 +44,10 @@ impl StorageWrapper {
 
     pub fn data(&self) -> &Data {
         self.data.data()
+    }
+
+    pub fn resolver(&self) -> MediaResolver {
+        self.data.resolver()
     }
 }
 

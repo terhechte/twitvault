@@ -51,7 +51,7 @@ pub struct Data {
     /// Downloaded media with path to local file
     /// - Tweet Media: ExtendedUrlString
     /// - Profiles: Various Urls
-    pub media: HashMap<UrlString, PathBuf>,
+    pub media: HashMap<UrlString, String>,
 }
 
 impl Data {
@@ -138,6 +138,13 @@ impl Storage {
         action(&mut self.data)
     }
 
+    pub fn resolver(&self) -> MediaResolver {
+        MediaResolver {
+            root_folder: self.root_folder.join(FOLDER_MEDIA),
+            media: &self.data.media,
+        }
+    }
+
     // Blocking write
     pub fn save(&self) -> Result<()> {
         use std::fs::OpenOptions;
@@ -146,5 +153,23 @@ impl Storage {
             .write(true)
             .open(&self.data_path)?;
         Ok(serde_json::to_writer(outfile, &self.data)?)
+    }
+}
+
+#[derive(Clone)]
+pub struct MediaResolver<'a> {
+    root_folder: PathBuf,
+    media: &'a HashMap<UrlString, String>,
+}
+
+impl<'a> MediaResolver<'a> {
+    pub fn resolve(&self, url: &str) -> Option<String> {
+        let found = self.media.get(url)?;
+        // Some(format!("file://{found}"))
+        let path = self.root_folder.join(found);
+        //Some(dbg!(format!("file://{}", path.display())))
+        Some(path.display().to_string())
+        // Some(dbg!(format!("{}", )))
+        // Some(dbg!(path))
     }
 }
