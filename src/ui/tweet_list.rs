@@ -23,8 +23,14 @@ pub struct TweetListProps<'a> {
 pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
     let page_size = 100;
     let page = use_state(&cx, || page_size);
+    let inverse = use_state(&cx, || false);
     let has_more = cx.props.data.len() > *page.get();
-    let tweets_rendered = cx.props.data.iter().take(*page.get()).map(|tweet| {
+    let iter: Box<dyn Iterator<Item = &Tweet>> = if *inverse.get() {
+        Box::new(cx.props.data.iter().rev())
+    } else {
+        Box::new(cx.props.data.iter())
+    };
+    let tweets_rendered = iter.take(*page.get()).map(|tweet| {
         let responses = cx.props.responses.get(&tweet.id).as_ref().map(|e| e.len());
         cx.render(rsx!(TweetComponent {
             tweet: tweet,
@@ -35,10 +41,21 @@ pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
     });
 
     cx.render(rsx!(div {
-        onscroll: |evt| {
-            dbg!(evt);
-        },
-        h5 { "{cx.props.label}" }
+        div {
+            class: "hstack gap-3",
+            h5 {
+                "{cx.props.label}"
+            }
+            button {
+                class: "btn btn-info ms-auto",
+                r#type: "button",
+                onclick: move |_| {
+                    page.set(page_size);
+                    inverse.set(!(*inverse.get()));
+                },
+                "\u{21F5}"
+            }
+        }
         tweets_rendered
         ShowMoreButton {
             visible: has_more,
