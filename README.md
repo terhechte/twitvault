@@ -39,6 +39,7 @@ There ~might~ will be bugs for various usecases that I haven't run into during m
 
 Due to API limitations, not all data can be archived. For every category, Twitter only returns a certain amount of data:
 
+- No Bookmarks: Bookmarks require using the Twitter API V2. Currently my Twitter API Dashboard is disabled (I applied for access again, but haven't heard back), so I can't create a V2 Key. I already wrote the code to import the bookmarks (well, a raw, unfinished debug version), but then I couldn't test it because my key is incompatible. [The original code is here](https://github.com/terhechte/twitvault/commit/fbb2c334778a8fe7cbf8c0a184582f9447bbdaf5#diff-75b4decd4b27781684dc107fc2f8430b9d92699f8943cceeab16ea2ed3a9b9acL560)
 - Your Tweets: max 3.200
 - Your Mentions: max 800
 - Follows / Followers: No idea, but at least 5000, probably more
@@ -50,6 +51,8 @@ Due to API limitations, not all data can be archived. For every category, Twitte
 
 ### Download / Installation
 
+You will need at least Rust 1.65.0 because I've been waiting for [`let else` for a long time](https://rust-lang.github.io/rfcs/3137-let-else.html) (it was the first thing I missed when I started doing Rust in 2018), I want to use it anywhere.
+
 You can find a download in the release section. Or you can compile it yourself as follows:
 
 ``` sh
@@ -59,6 +62,8 @@ cargo build --release
 Note that if you're on Linux, some dependencies need to be met. Check out the [deploy.yml](.github/workflows/deploy.yml)
 
 > You will also need a valid Twitter API Key. Which has to be set in your shell environment.
+
+[To get a Twitter API Key, follow their getting started guide](https://developer.twitter.com/en/docs/twitter-api/getting-started/about-twitter-api)
 
 ### Twitter Archive Sync
 
