@@ -30,6 +30,8 @@ pub struct Config {
     /// Remember the paging positions for the different endpoints,
     /// so that restarting the crawler will continue where it left off.
     paging_positions: Arc<Mutex<PagingPositions>>,
+    /// If this is a config for a custom path
+    custom_path: Option<PathBuf>,
 }
 
 impl PartialEq for Config {
@@ -41,12 +43,20 @@ impl PartialEq for Config {
 impl Eq for Config {}
 
 impl Config {
-    pub fn storage_path() -> PathBuf {
-        data_directory().join(ARCHIVE_PATH)
+    pub fn actual_storage_path(&self) -> PathBuf {
+        Self::storage_path(self.custom_path.clone())
     }
 
-    pub fn config_path() -> PathBuf {
-        data_directory().join(SETTINGS_FILE)
+    pub fn storage_path(custom: Option<PathBuf>) -> PathBuf {
+        custom
+            .unwrap_or_else(|| data_directory())
+            .join(ARCHIVE_PATH)
+    }
+
+    pub fn config_path(custom: Option<PathBuf>) -> PathBuf {
+        custom
+            .unwrap_or_else(|| data_directory())
+            .join(SETTINGS_FILE)
     }
 
     pub fn screen_name(&self) -> &str {
@@ -92,16 +102,16 @@ impl Config {
     fn keypair() -> KeyPair {
         // somehow dotenv and dotenvy doesn't behave as expected. need to look into it:
         // https://github.com/dotenv-rs/dotenv/issues/71
-        let consumer_key = obfstr::obfstr!(env!("API_KEY")).trim().to_string();
-        let consumer_secret = obfstr::obfstr!(env!("API_SECRET")).trim().to_string();
+        let consumer_key = obfstr::obfstr!(dotenv!("API_KEY")).trim().to_string();
+        let consumer_secret = obfstr::obfstr!(dotenv!("API_SECRET")).trim().to_string();
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }
-    pub fn open() -> Result<Self> {
+    pub fn open(custom_path: Option<PathBuf>) -> Result<Self> {
         let con_token = Self::keypair();
 
         let (token, config_data, paging_positions) = {
-            let path = Config::config_path();
+            let path = Config::config_path(custom_path.clone());
             let fp = std::fs::File::open(path)?;
             let config_data: ConfigData = serde_json::from_reader(fp)?;
             let paging_positions: PagingPositions = std::fs::File::open(PAGING_FILE)
@@ -124,6 +134,7 @@ impl Config {
             config_data,
             paging_positions: Arc::new(Mutex::new(paging_positions)),
             is_sync: false,
+            custom_path,
         })
     }
 
@@ -133,22 +144,22 @@ impl Config {
             .map(|_| ())?)
     }
 
-    pub async fn load() -> Result<Self> {
-        let a1 = Config::load_inner().await;
+    pub async fn load(custom_path: Option<PathBuf>) -> Result<Self> {
+        let a1 = Config::load_inner(custom_path.clone()).await;
         if let Ok(conf) = a1 {
             return Ok(conf);
         }
 
-        Config::load_inner().await
+        Config::load_inner(custom_path).await
     }
 
-    async fn load_inner() -> Result<Self> {
-        if let Ok(config) = Self::open() {
+    async fn load_inner(custom_path: Option<PathBuf>) -> Result<Self> {
+        if let Ok(config) = Self::open(custom_path.clone()) {
             if let Err(err) = config.verify().await {
                 println!("We've hit an error using your old tokens: {:?}", err);
                 println!("We'll have to reauthenticate before continuing.");
                 println!("Last Paging Positions");
-                let path = Config::config_path();
+                let path = Config::config_path(custom_path.clone());
                 std::fs::remove_file(path).unwrap();
                 bail!("Please Relogin")
             } else {
@@ -157,7 +168,7 @@ impl Config {
             Ok(config)
         } else {
             println!("Request Token");
-            let request_data = RequestData::request().await?;
+            let request_data = RequestData::request(custom_path.clone()).await?;
 
             println!("Go to the following URL, sign in, and give me the PIN that comes back:");
             println!("{}", request_data.authorize_url);
@@ -167,7 +178,7 @@ impl Config {
             println!();
 
             let config = request_data.validate(&pin).await?;
-            config.config_data.write()?;
+            config.config_data.write(custom_path.clone())?;
             Ok(config)
         }
     }
@@ -178,10 +189,11 @@ pub struct RequestData {
     request_token: KeyPair,
     pub authorize_url: String,
     user_pin: String,
+    custom_path: Option<PathBuf>,
 }
 
 impl RequestData {
-    pub async fn request() -> Result<Self> {
+    pub async fn request(custom_path: Option<PathBuf>) -> Result<Self> {
         let con_token = Config::keypair();
         let request_token = egg_mode::auth::request_token(&con_token, "oob").await?;
         let authorize_url = egg_mode::auth::authorize_url(&request_token);
@@ -190,6 +202,7 @@ impl RequestData {
             request_token,
             authorize_url,
             user_pin: String::new(),
+            custom_path,
         })
     }
 
@@ -212,13 +225,14 @@ impl RequestData {
             _ => bail!("Invalid Token Type {token:?}"),
         };
 
-        config_data.write()?;
+        config_data.write(self.custom_path.clone())?;
 
         Ok(Config {
             token,
             config_data,
             paging_positions: Default::default(),
             is_sync: false,
+            custom_path: self.custom_path.clone(),
         })
     }
 }
@@ -277,8 +291,8 @@ impl Default for CrawlOptions {
 }
 
 impl ConfigData {
-    fn write(&self) -> Result<()> {
-        let path = Config::config_path();
+    fn write(&self, custom_path: Option<PathBuf>) -> Result<()> {
+        let path = Config::config_path(custom_path);
         let f = std::fs::File::create(&path)?;
         serde_json::to_writer(f, &self)?;
         Ok(())

@@ -45,7 +45,7 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
         let current = (*login_state.current()).clone();
         async move {
             match current {
-                LoginState::Initial => RequestData::request()
+                LoginState::Initial => RequestData::request(None)
                     .await
                     .map(LoginStateResult::RequestData)
                     .unwrap_or_else(|e| LoginStateResult::Error(e.to_string())),

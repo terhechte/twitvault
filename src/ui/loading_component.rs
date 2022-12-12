@@ -22,13 +22,15 @@ pub fn LoadingComponent(
     let appeared = cx.use_hook(|_| false);
     let message_state = use_state(&cx, || Message::Initial);
 
+    let user_id = config.user_id();
+
     let (sender, mut receiver) = channel(4096);
     if !*appeared {
         *appeared = true;
         let cloned_config = config.clone();
         cx.spawn(async move {
-            let path = Config::storage_path();
-            if let Err(e) = crate::crawler::crawl_new_storage(cloned_config, &path, sender).await {
+            if let Err(e) = crate::crawler::crawl_new_storage(cloned_config, sender, user_id).await
+            {
                 warn!("Error {e:?}");
             }
         });

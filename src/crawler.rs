@@ -32,33 +32,39 @@ use crate::config::Config;
 /// Internal messaging between the different threads
 #[derive(Debug)]
 pub enum DownloadInstruction {
+    /// Download an image
     Image(String),
+    /// Download a Movie
     Movie(mime::Mime, String),
+    /// Download the media of a profile
     ProfileMedia(String),
+    /// Tells the thread to close as all the crawling finished
     Done,
 }
 
 pub async fn crawl_new_storage(
     config: Config,
-    storage_path: &Path,
     message_sender: Sender<Message>,
+    user_id: u64,
 ) -> Result<()> {
-    let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
+    let storage_path = config.actual_storage_path();
+    let Ok(user_container) = egg_mode::user::lookup([user_id], &config.token).await else { bail!("Could not find user") };
     let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
     let mut storage = Storage::new(user.clone(), storage_path)?;
     storage.with_data(|d| {
         d.profiles.insert(user.id, user.clone());
     });
-    crawl_into_storage(config, storage, message_sender).await
+    crawl_into_storage(user_id, config, storage, message_sender).await
 }
 
 pub async fn crawl_into_storage(
+    user_id: u64,
     config: Config,
     storage: Storage,
     sender: Sender<Message>,
 ) -> Result<()> {
     let crawl_task = tokio::spawn(async move {
-        match fetch(&config, storage, sender.clone()).await {
+        match fetch(user_id, &config, storage, sender.clone()).await {
             Ok(_) => {
                 println!("crawl_task done");
             }
@@ -106,8 +112,12 @@ async fn msg(msg: impl AsRef<str>, sender: &Sender<Message>) {
     }
 }
 
-async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Result<()> {
-    let user_id = storage.data().profile.id;
+async fn fetch(
+    user_id: u64,
+    config: &Config,
+    storage: Storage,
+    sender: Sender<Message>,
+) -> Result<()> {
     let shared_storage = Arc::new(Mutex::new(storage));
 
     async fn save_data(storage: &Arc<Mutex<Storage>>) {
@@ -120,7 +130,7 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         create_instruction_handler(config.crawl_options().media, shared_storage.clone());
 
     fetch_single_profile(
-        config.user_id(),
+        user_id,
         shared_storage.clone(),
         config,
         instruction_sender.clone(),
@@ -139,15 +149,21 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         save_data(&shared_storage).await;
     }
 
+    // If we're not crawling for the authenticated user
+    // we can't crawl mentions
     if config.crawl_options().mentions {
-        fetch_user_mentions(
-            shared_storage.clone(),
-            config,
-            instruction_sender.clone(),
-            sender.clone(),
-        )
-        .await?;
-        save_data(&shared_storage).await;
+        if config.user_id() != user_id {
+            info!("Can't crawl mentions for custom-user");
+        } else {
+            fetch_user_mentions(
+                shared_storage.clone(),
+                config,
+                instruction_sender.clone(),
+                sender.clone(),
+            )
+            .await?;
+            save_data(&shared_storage).await;
+        }
     }
 
     if config.crawl_options().followers {
@@ -678,7 +694,8 @@ pub async fn inspect_tweet(
     }
 
     if config.crawl_options().tweet_responses {
-        // for our own tweets, we search for responses
+        // for our own tweets, we search for responses.
+        // but only if we don't have a custom-user
         if tweet.user.is_none() || tweet.user.as_ref().map(|e| e.id) == Some(config.user_id()) {
             if let Err(e) =
                 fetch_tweet_replies(tweet, storage.clone(), config, sender, message_sender).await

@@ -18,7 +18,10 @@ use tracing::{info, warn};
 use config::Config;
 use storage::Storage;
 
-use std::path::Path;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use crate::types::Message;
 
@@ -26,16 +29,35 @@ use crate::types::Message;
 async fn main() -> Result<()> {
     setup_tracing();
     let name = "TwitVault";
-    let storage_path = config::Config::storage_path();
-    if !storage_path.exists() {
-        std::fs::create_dir_all(&storage_path)
-            .expect("Expect to be able to create the data directory");
-    }
-    println!("Try opening Storage: {}", storage_path.display());
 
-    let config = config::Config::open().ok();
+    // check if we have a path to a custom storage
+    let raw_args: Vec<_> = std::env::args().collect();
+    let (config, storage, storage_path) =
+        match (raw_args.get(1).map(|e| e.as_str()), raw_args.get(2)) {
+            (Some("--custom-archive"), Some(custom)) => {
+                let custom_path = PathBuf::from_str(custom)?;
+                if !custom_path.exists() {
+                    std::fs::create_dir_all(&custom_path)
+                        .expect("Expect to be able to create the data directory");
+                }
+                println!("Try opening Storage: {}", &custom_path.display());
+                let config = config::Config::open(Some(custom_path.clone())).ok();
+                let storage = Storage::open(custom_path.clone());
+                (config, storage, custom_path)
+            }
+            _ => {
+                let storage_path = config::Config::storage_path(None);
+                if !storage_path.exists() {
+                    std::fs::create_dir_all(&storage_path)
+                        .expect("Expect to be able to create the data directory");
+                }
+                println!("Try opening Storage: {}", storage_path.display());
+                let config = config::Config::open(None).ok();
+                let storage = Storage::open(&storage_path);
+                (config, storage, storage_path)
+            }
+        };
 
-    let storage = Storage::open(&storage_path);
     let cmd = match &storage {
         Ok(existing) => clap::Command::new(name)
             .bin_name(name)
@@ -44,6 +66,10 @@ async fn main() -> Result<()> {
                 existing.root_folder.display(),
                 existing.data().profile.screen_name
             ))
+            .arg(clap::Arg::new("custom-archive")
+            .long("custom-archive")
+            .help("Absolute path to a different archive folder tahn the default")
+            .required(false))
             .subcommand_required(false)
             .subcommand(clap::command!("sync"))
             .subcommand(
@@ -55,20 +81,29 @@ async fn main() -> Result<()> {
             .bin_name(name)
             .after_help(format!(
                 "Found no existing storage at {}",
-                Config::storage_path().display()
+                storage_path.display()
             ))
             .subcommand_required(false)
-            .subcommand(clap::command!("crawl")),
+            .subcommand(
+                Command::new("crawl")
+                    .arg(clap::Arg::new("custom-user")
+                    .help("Don't crawl the data of the authenticated user, but instead of the given custom-user which is the Twitter user id such as 6473172")
+                    .required(false).short('u')),
+            ),
     };
 
     let matches = cmd.get_matches();
     match (matches.subcommand(), storage, config) {
         // Try to crawl with a pre-defined config
-        (Some(("crawl", _)), Err(_), Some(config)) => action_crawl(&config, &storage_path).await?,
+        (Some(("crawl", custom)), Err(_), Some(config)) => {
+            action_crawl(&config, &storage_path, custom).await?
+        }
         // If there's no config, perform the login dance in the terminal, then crawl
-        (Some(("crawl", _)), Err(_), None) => {
-            let config = Config::load().await.expect("Could not create config");
-            action_crawl(&config, &storage_path).await?
+        (Some(("crawl", custom)), Err(_), None) => {
+            let config = Config::load(Some(storage_path.clone()))
+                .await
+                .expect("Could not create config");
+            action_crawl(&config, &storage_path, custom).await?
         }
         // Import a Twitter archive
         (Some(("import", archive)), Ok(storage), Some(config)) => {
@@ -97,11 +132,30 @@ async fn action_import(config: &Config, storage: Storage, matches: &ArgMatches) 
     Ok(())
 }
 
-async fn action_crawl(config: &Config, storage_path: &Path) -> Result<()> {
+async fn action_crawl(config: &Config, _storage_path: &Path, matches: &ArgMatches) -> Result<()> {
+    let user_id = match matches
+        .get_one::<String>("custom-user")
+        .map(|n| n.parse::<u64>())
+    {
+        Some(Err(e)) => {
+            bail!("The given custom-user could not be parsed: {e:?}")
+        }
+        Some(Ok(n)) => n,
+        None => config.user_id(),
+    };
     info!("Crawling");
     let (sender, receiver) = channel(256);
 
-    crawler::crawl_new_storage(config.clone(), storage_path, sender).await?;
+    // In custom-user mode, disable responses and mentions
+    let mut config = config.clone();
+    if user_id != config.user_id() {
+        let mut options = config.crawl_options().clone();
+        options.mentions = false;
+        options.tweet_responses = false;
+        config.set_crawl_options(&options);
+    }
+
+    crawler::crawl_new_storage(config, sender, user_id).await?;
     let storage = log_task(receiver).await??;
     if let Err(e) = storage.save() {
         warn!("Could not save storage {e:?}");
@@ -115,7 +169,7 @@ async fn action_sync(config: &Config, storage: Storage) -> Result<()> {
     let mut config = config.clone();
     config.is_sync = true;
     let (sender, receiver) = channel(256);
-    crawler::crawl_into_storage(config.clone(), storage, sender).await?;
+    crawler::crawl_into_storage(config.user_id(), config.clone(), storage, sender).await?;
     let storage = log_task(receiver).await??;
     storage.save()?;
     action_inspect(&storage).await?;
