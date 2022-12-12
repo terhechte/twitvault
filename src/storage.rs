@@ -52,11 +52,14 @@ pub struct Data {
     /// - Tweet Media: ExtendedUrlString
     /// - Profiles: Various Urls
     pub media: HashMap<UrlString, String>,
+    /// The likes the user performed
+    #[serde(default)]
+    pub likes: Vec<Tweet>,
 }
 
 impl Data {
     pub fn any_tweet(&self, id: TweetId) -> Option<&Tweet> {
-        for tweets in [&self.tweets, &self.mentions] {
+        for tweets in [&self.tweets, &self.mentions, &self.likes] {
             for t in tweets {
                 if t.id == id {
                     return Some(t);
@@ -115,6 +118,7 @@ impl Storage {
                 follows: Default::default(),
                 lists: Default::default(),
                 media: Default::default(),
+                likes: Default::default(),
             },
         )
     }

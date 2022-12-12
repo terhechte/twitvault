@@ -166,6 +166,18 @@ async fn fetch(
         }
     }
 
+    if config.crawl_options().likes {
+        fetch_user_likes(
+            user_id,
+            shared_storage.clone(),
+            config,
+            instruction_sender.clone(),
+            sender.clone(),
+        )
+        .await?;
+        save_data(&shared_storage).await;
+    }
+
     if config.crawl_options().followers {
         fetch_user_followers(
             user_id,
@@ -333,6 +345,71 @@ async fn fetch_user_mentions(
         s.data_mut().mentions.splice(0..0, collected);
     } else {
         s.data_mut().mentions.append(&mut collected);
+    }
+
+    config.set_paging_position("user_mentions", None);
+
+    Ok(())
+}
+
+async fn fetch_user_likes(
+    id: u64,
+    shared_storage: Arc<Mutex<Storage>>,
+    config: &Config,
+    sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
+) -> Result<()> {
+    let label = "User Likes";
+    msg(label, &message_sender).await;
+    let mut timeline = tweet::liked_by(id, &config.token).with_page_size(200);
+
+    let mut first_page = config.paging_position("user_likes");
+
+    let first_id = shared_storage.lock().await.data().likes.first().cloned();
+    let is_sync = config.is_sync;
+
+    let mut collected = Vec::new();
+
+    'outer: loop {
+        tracing::info!("Downloading Likes before {:?}", timeline.min_id);
+        let (next_timeline, mut feed) = timeline.older(first_page).await?;
+        first_page = None;
+        if feed.response.is_empty() {
+            break;
+        }
+        for tweet in feed.response.iter() {
+            // In this case, we know the tweet and we stop loading further
+            if is_sync && Some(tweet.id) == first_id.as_ref().map(|e| e.id) {
+                break 'outer;
+            }
+            inspect_tweet(
+                tweet,
+                shared_storage.clone(),
+                config,
+                &sender,
+                &message_sender,
+            )
+            .await?;
+        }
+        collected.append(&mut feed.response);
+
+        handle_rate_limit(
+            &feed.rate_limit_status,
+            "User Likes",
+            message_sender.clone(),
+        )
+        .await;
+        timeline = next_timeline;
+        config.set_paging_position("user_likes", timeline.min_id);
+
+        msg(format!("{label}: {}", collected.len()), &message_sender).await;
+    }
+
+    let mut s = shared_storage.lock().await;
+    if is_sync {
+        s.data_mut().likes.splice(0..0, collected);
+    } else {
+        s.data_mut().likes.append(&mut collected);
     }
 
     config.set_paging_position("user_mentions", None);

@@ -295,6 +295,9 @@ pub struct CrawlOptions {
     pub lists: bool,
     /// Download media from tweets and profiles
     pub media: bool,
+    /// Download the liked tweets and profiles for a user
+    #[serde(default)]
+    pub likes: bool,
 }
 
 impl CrawlOptions {
@@ -316,6 +319,7 @@ impl Default for CrawlOptions {
             follows: true,
             lists: false,
             media: true,
+            likes: true,
         }
     }
 }

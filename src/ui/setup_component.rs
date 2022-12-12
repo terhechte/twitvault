@@ -39,6 +39,13 @@ pub fn SetupComponent(cx: Scope, config: Config, loading_state: UseState<Loading
                     disabled: false
                 }
                 Checkbox {
+                    name: "Likes",
+                    label: "The likes of a given user",
+                    onclick: move |_| params.modify(|e| e.changed(|o| o.likes = !o.likes)),
+                    checked: params.get().likes,
+                    disabled: false
+                }
+                Checkbox {
                     name: "User Profiles",
                     label: "From Responses and Mentions",
                     onclick: move |_| params.modify(|e| e.changed(|o| o.tweet_profiles = !o.tweet_profiles)),
