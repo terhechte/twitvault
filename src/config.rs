@@ -43,20 +43,30 @@ impl PartialEq for Config {
 impl Eq for Config {}
 
 impl Config {
+    /// The storage path for a given initialized config.
+    /// will include a `custom path` if that has been
+    /// set by the user at runtime
     pub fn actual_storage_path(&self) -> PathBuf {
         Self::storage_path(self.custom_path.clone())
     }
 
+    /// The default storage path *or* the custom path which
+    /// a user can set at runtime
     pub fn storage_path(custom: Option<PathBuf>) -> PathBuf {
         custom
             .unwrap_or_else(|| data_directory())
             .join(ARCHIVE_PATH)
     }
 
+    /// The path to the config file which is within
+    /// the `storage_path`
     pub fn config_path(custom: Option<PathBuf>) -> PathBuf {
-        custom
-            .unwrap_or_else(|| data_directory())
-            .join(SETTINGS_FILE)
+        Config::storage_path(custom).join(SETTINGS_FILE)
+    }
+
+    /// The path to the paging file
+    pub fn paging_path(custom: Option<PathBuf>) -> PathBuf {
+        Config::storage_path(custom).join(PAGING_FILE)
     }
 
     pub fn screen_name(&self) -> &str {
@@ -88,12 +98,13 @@ impl Config {
         } else {
             lock.remove(key);
         }
-        let Ok(f) = std::fs::File::create(PAGING_FILE) else {
-            warn!("Could not create / save {PAGING_FILE}");
+        let paging_path = Config::paging_path(self.custom_path.clone());
+        let Ok(f) = std::fs::File::create(paging_path.clone()) else {
+            warn!("Could not create / save {}", &paging_path.display());
             return
         };
         if let Err(e) = serde_json::to_writer(f, &(*lock)) {
-            warn!("Could not serialize {PAGING_FILE}: {e:?}");
+            warn!("Could not serialize {}: {e:?}", &paging_path.display());
         }
     }
 }
@@ -111,10 +122,29 @@ impl Config {
         let con_token = Self::keypair();
 
         let (token, config_data, paging_positions) = {
-            let path = Config::config_path(custom_path.clone());
+            // if we can't find the path in the archive (default),
+            // then try in the parent directory (backwards compatibility)
+            let mut path = Config::config_path(custom_path.clone());
+            if !path.exists() {
+                let old_path = Config::storage_path(custom_path.clone())
+                    .parent()
+                    .map(|e| e.to_owned())
+                    .ok_or(eyre::eyre!("No root folder for storage path"))?;
+                let old_config_path = old_path.join(SETTINGS_FILE);
+                if old_config_path.exists() {
+                    path = old_config_path;
+                } else {
+                    bail!(
+                        "Could not find config file in either {} or {}",
+                        path.display(),
+                        old_config_path.display()
+                    )
+                }
+            }
             let fp = std::fs::File::open(path)?;
             let config_data: ConfigData = serde_json::from_reader(fp)?;
-            let paging_positions: PagingPositions = std::fs::File::open(PAGING_FILE)
+            let paging_path = Self::paging_path(custom_path.clone());
+            let paging_positions: PagingPositions = std::fs::File::open(paging_path)
                 .map_err(|e| eyre::eyre!("{e:?}"))
                 .and_then(|e| serde_json::from_reader(e).map_err(|e| eyre::eyre!("{e:?}")))
                 .unwrap_or_default();
