@@ -6,7 +6,7 @@ use egg_mode::user::TwitterUser;
 
 use crate::config::Config;
 use crate::crawler::DownloadInstruction;
-use crate::helpers::delete_tweet;
+use crate::helpers::{delete_tweet, open_file};
 use crate::storage::MediaResolver;
 
 use egg_mode::tweet::Tweet;
@@ -121,9 +121,14 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                 .unwrap_or_else(|| entry.clone())
         })
         .map(|entry| {
+            let cloned = entry.clone();
             rsx!(img {
-                src: "{entry}",
-                class: "card-img-bottom img-thumbnail"
+                src: "{cloned}",
+                style: "cursor: pointer",
+                class: "card-img-bottom img-thumbnail",
+                onclick: move |_| {
+                    open_file(&entry);
+                }
             })
         })
         .unwrap_or_else(|| rsx!(div {}));
@@ -142,6 +147,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                 .unwrap_or_else(|| entry.clone())
         })
         .map(|entry| {
+            let clone = entry.clone();
             rsx!( div {
                 class: "ratio ratio-16x9",
                 video {
@@ -149,7 +155,15 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                     source {
                         src: "{entry}"
                     }
-            }
+                }
+                small {
+                    a {
+                        class: "link-secondary",
+                        href: "#",
+                        onclick: move |_| open_file(&clone),
+                        "Locate Video on Disk"
+                    }
+                }
             })
         })
         .unwrap_or_else(|| rsx!(div {}));

@@ -44,3 +44,22 @@ pub async fn delete_tweet(tweet_id: u64, config: &Config) -> Result<bool, String
             format!("{e:?}")
         })
 }
+
+/// Sorta cross-platform way of opening a file
+pub fn open_file(path: &str) {
+    use std::process::Command;
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer").arg(path).spawn().ok();
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open").arg(path).spawn().ok();
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open").args(["-R", path]).spawn().ok();
+    }
+}
