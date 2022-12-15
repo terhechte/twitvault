@@ -160,6 +160,7 @@ impl Storage {
     }
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 pub struct MediaResolver<'a> {
     root_folder: PathBuf,
@@ -168,8 +169,18 @@ pub struct MediaResolver<'a> {
 
 impl<'a> MediaResolver<'a> {
     pub fn resolve(&self, url: &str) -> Option<String> {
-        let found = self.media.get(url)?;
-        let path = self.root_folder.join(found);
-        Some(path.display().to_string())
+        // if we're on windows, we just return the URL. Somehow the file locating
+        // trick we use with Dioxus doesn't work on Windows
+        #[cfg(target_os = "windows")]
+        {
+            Some(url.to_string())
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let found = self.media.get(url)?;
+            let path = self.root_folder.join(found);
+            Some(path.display().to_string())
+        }
     }
 }
