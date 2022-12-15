@@ -1,5 +1,7 @@
-use crate::crawler::DownloadInstruction;
+use crate::{config::Config, crawler::DownloadInstruction};
 use egg_mode::tweet::Tweet;
+use futures::TryFutureExt;
+use tracing::warn;
 
 pub fn media_in_tweet(tweet: &Tweet) -> Option<Vec<DownloadInstruction>> {
     let Some(entities) = &tweet.extended_entities else { return None };
@@ -32,4 +34,14 @@ pub fn media_in_tweet(tweet: &Tweet) -> Option<Vec<DownloadInstruction>> {
     }
 
     Some(output)
+}
+
+pub async fn delete_tweet(tweet_id: u64, config: &Config) -> Result<bool, String> {
+    egg_mode::tweet::delete(tweet_id, &config.token)
+        .await
+        .map(|_| true)
+        .map_err(|e| {
+            warn!("Could not delete tweet: {e:?}");
+            format!("{e:?}")
+        })
 }

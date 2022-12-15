@@ -4,6 +4,7 @@ use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
+use crate::config::Config;
 use crate::storage::MediaResolver;
 
 use super::main_component::{ColumnState, COLUMN2};
@@ -13,6 +14,7 @@ use super::tweet_component::TweetComponent;
 pub struct AuthorProps<'a> {
     profile: &'a TwitterUser,
     media: MediaResolver<'a>,
+    config: &'a Config,
 }
 
 pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
@@ -82,7 +84,8 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
                     tweet: quoted,
                     media: cx.props.media.clone(),
                     user: cx.props.profile
-                    responses: None
+                    responses: None,
+                    config: cx.props.config
                 }
             })
         })

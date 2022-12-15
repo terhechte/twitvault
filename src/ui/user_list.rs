@@ -4,6 +4,7 @@ use std::{borrow::Cow, collections::HashMap};
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
+use crate::config::Config;
 use crate::storage::MediaResolver;
 
 use super::helpers::{BottomSpacer, ShowMoreButton};
@@ -15,6 +16,7 @@ pub struct AuthorListProps<'a> {
     media: MediaResolver<'a>,
     profiles: &'a HashMap<u64, TwitterUser>,
     label: String,
+    config: &'a Config,
 }
 
 pub fn AuthorListComponent<'a>(cx: Scope<'a, AuthorListProps>) -> Element<'a> {
@@ -26,6 +28,7 @@ pub fn AuthorListComponent<'a>(cx: Scope<'a, AuthorListProps>) -> Element<'a> {
             cx.render(rsx!(AuthorComponent {
                 profile: user,
                 media: cx.props.media.clone(),
+                config: cx.props.config
             }))
         } else {
             cx.render(rsx!(div {

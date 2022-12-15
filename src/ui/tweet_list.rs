@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
+use crate::config::Config;
 use crate::storage::MediaResolver;
 
 use egg_mode::tweet::Tweet;
@@ -18,6 +19,7 @@ pub struct TweetListProps<'a> {
     user: &'a TwitterUser,
     responses: &'a HashMap<u64, Vec<Tweet>>,
     label: String,
+    config: &'a Config,
 }
 
 pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
@@ -36,7 +38,8 @@ pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
             tweet: tweet,
             media: cx.props.media.clone(),
             user: cx.props.user
-            responses: responses
+            responses: responses,
+            config: cx.props.config
         }))
     });
 

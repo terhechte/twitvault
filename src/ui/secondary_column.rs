@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use dioxus::fermi::{use_atom_state, AtomState};
 use dioxus::prelude::*;
 
+use crate::config::Config;
 use crate::ui::user_list::AuthorListComponent;
 
 use super::helpers::Box;
@@ -19,6 +20,7 @@ pub fn SecondaryColumn(
     cx: Scope,
     storage: StorageWrapper,
     selected: AtomState<ColumnState>,
+    config: Config,
 ) -> Element {
     let column2 = use_atom_state(&cx, COLUMN2);
 
@@ -42,7 +44,8 @@ pub fn SecondaryColumn(
                         media: storage.resolver(),
                         label: label,
                         user: &storage.data().profile,
-                        responses: &storage.data().responses
+                        responses: &storage.data().responses,
+                        config: &config
                     }
                 }
             }
@@ -59,6 +62,7 @@ pub fn SecondaryColumn(
                         media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label
+                        config: &config
                     }
                 }
             }
@@ -72,7 +76,8 @@ pub fn SecondaryColumn(
                         style: "{column_style}",
                         AuthorComponent {
                             profile: profile,
-                            media: storage.resolver()
+                            media: storage.resolver(),
+                            config: &config
                         }
                     }
                 }
@@ -104,7 +109,8 @@ pub fn SecondaryColumn(
                             tweet: tweet,
                             media: storage.resolver(),
                             user: &storage.data().profile,
-                            responses: None
+                            responses: None,
+                            config: &config
                         }
                     }
                 }

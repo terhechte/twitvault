@@ -3,8 +3,11 @@
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
+use tracing::info;
 
+use crate::config::Config;
 use crate::crawler::DownloadInstruction;
+use crate::helpers::delete_tweet;
 use crate::storage::MediaResolver;
 
 use egg_mode::tweet::Tweet;
@@ -18,6 +21,7 @@ pub struct TweetProps<'a> {
     media: MediaResolver<'a>,
     user: &'a TwitterUser,
     responses: Option<Option<usize>>,
+    config: &'a Config,
 }
 
 pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
@@ -39,6 +43,16 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
 
     // we can only delete our own tweets
     let can_delete = cx.props.user.id == user.id;
+
+    // The deletion action
+    let cloned_config = cx.props.config.clone();
+    let deletion_tweet: &UseState<Option<u64>> = use_state(&cx, || None);
+    let deletion_future = use_future(&cx, deletion_tweet, |oid| async move {
+        let Some(id) = oid.get() else {
+            return None
+        };
+        Some(delete_tweet(*id, &cloned_config).await)
+    });
 
     let action_dropdown = rsx! {
         div {
@@ -211,6 +225,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                     media: cx.props.media.clone(),
                     user: cx.props.user
                     responses: None
+                    config: cx.props.config
                 }
             })
         })
@@ -281,7 +296,10 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                                 class: "btn btn-danger",
                                 "data-bs-dismiss": "modal",
                                 r#type: "button",
-                                onclick: move |_| println!("DELETE"),
+                                onclick: move |_| {
+                                    deletion_tweet.set(Some(tweet.id));
+                                    deletion_future.restart();
+                                },
                                 "Yes, delete please"
                             }
                         }
@@ -345,5 +363,3 @@ fn formatted_tweet(tweet: &Tweet) -> String {
 
     output
 }
-
-// This could certainly be placed some
