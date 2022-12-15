@@ -79,24 +79,6 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 "Once you give access, you will see a pin-code. Enter it here to proceed to the next step"
             }
 
-            div {
-                class: "card text-bg-light mb-3",
-                div {
-                    class: "card-header",
-                    "Note:"
-                }
-                div {
-                    class: "card-body",
-                    p {
-                        class: "card-text",
-                        "The app is called "
-                        strong {
-                            "SwiftWatch "
-                        }
-                        "because I can't access the Twitter Dashboard. This is the only API Key I have"
-                    }
-                }
-            }
             NextButton {
                 title: "Next",
                 kind: "button",
