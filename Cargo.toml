@@ -1,6 +1,6 @@
 [package]
 name = "twitvault"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Archive your Twitter data into a offline desktop app"
 authors = ["Benedikt Terhechte"]
@@ -17,7 +17,7 @@ exclude = ["data", "assets", ".vscode", "icons.sketch"]
 name = "TwitVault"
 identifier = "com.stylemac.twitvault"
 icon = ["icons/Icon.icns", "icons/win-256.png", "icons/win-32.png"]
-version = "0.1.0"
+version = "0.2.0"
 copyright = "Copyright (c) Benedikt Terhechte (2022). All rights reserved."
 category = "Social Network"
 short_description = "Archive your Twitter data into a offline desktop app"
