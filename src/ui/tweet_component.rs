@@ -31,7 +31,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
 
     let column2 = use_atom_state(&cx, COLUMN2);
 
-    let date = tweet.created_at.format("%d/%m/%Y %H:%M").to_string();
+    let date = tweet.created_at.format("%d/%m/%y %H:%M").to_string();
 
     let pure_text = &tweet.text;
 
@@ -181,6 +181,7 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
             }
             span {
                 class: "text-muted me-auto",
+                style: "font-size: 12px",
                 "{date}"
             }
             action_dropdown

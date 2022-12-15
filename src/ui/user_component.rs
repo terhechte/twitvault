@@ -19,7 +19,7 @@ pub struct AuthorProps<'a> {
 
 pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
     let author = cx.props.profile;
-    let date = author.created_at.format("%d/%m/%Y %H:%M").to_string();
+    let date = author.created_at.format("%b %d %Y").to_string();
     let description = author.description.as_ref().cloned().unwrap_or_default();
     let followers = author.followers_count;
     let follows = author.friends_count;
