@@ -68,26 +68,30 @@ async fn main() -> Result<()> {
             ))
             .arg(clap::Arg::new("custom-archive")
             .long("custom-archive")
-            .help("Absolute path to a different archive folder tahn the default")
+            .help("Absolute path to a different archive folder")
             .required(false))
             .subcommand_required(false)
-            .subcommand(clap::command!("sync"))
+            .subcommand(Command::new("sync"))
             .subcommand(
                 Command::new("import")
                     .arg(clap::Arg::new("archive-path").required(true).short('c')),
             )
-            .subcommand(clap::command!("inspect")),
+            .subcommand(Command::new("inspect")),
         Err(_) => clap::Command::new(name)
             .bin_name(name)
             .after_help(format!(
                 "Found no existing storage at {}",
                 storage_path.display()
             ))
+            .arg(clap::Arg::new("custom-archive")
+            .long("custom-archive")
+            .help("Absolute path to a different archive folder")
+            .required(false))
             .subcommand_required(false)
             .subcommand(
                 Command::new("crawl")
                     .arg(clap::Arg::new("custom-user")
-                    .help("Don't crawl the data of the authenticated user, but instead of the given custom-user which is the Twitter user id such as 6473172")
+                    .help("Don't crawl the data of the authenticated user, but instead of the given custom-user which is the Twitter user id such as 6473172. You can find the id for a user via this website: https://tweeterid.com")
                     .required(false).short('u')),
             ),
     };

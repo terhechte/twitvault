@@ -53,7 +53,7 @@ impl Config {
     /// The default storage path *or* the custom path which
     /// a user can set at runtime
     pub fn storage_path(custom: Option<PathBuf>) -> PathBuf {
-        custom.unwrap_or_else(data_directory).join(ARCHIVE_PATH)
+        custom.unwrap_or_else(|| data_directory().join(ARCHIVE_PATH))
     }
 
     /// The path to the config file which is within
@@ -198,15 +198,61 @@ impl Config {
             println!("Request Token");
             let request_data = RequestData::request(custom_path.clone()).await?;
 
-            println!("Go to the following URL, sign in, and give me the PIN that comes back:");
+            println!(
+                "Go to the following URL, sign in, and paste the PIN here and hit enter / return"
+            );
             println!("{}", request_data.authorize_url);
 
             let mut pin = String::new();
             std::io::stdin().read_line(&mut pin).unwrap();
             println!();
 
-            let config = request_data.validate(&pin).await?;
+            let mut config = request_data.validate(&pin).await?;
+
+            'outer: loop {
+                println!("Which data do you intend to crawl? Please enter space-seperated numbers and hit enter / return:");
+                let mut options = CrawlOptions::default();
+                let mut items = [
+                    ("Tweets", &mut options.tweets),
+                    ("Responses", &mut options.tweet_responses),
+                    ("Tweet Profiles", &mut options.tweet_profiles),
+                    ("Mentions", &mut options.mentions),
+                    ("Followers", &mut options.followers),
+                    ("Follows", &mut options.follows),
+                    ("Lists", &mut options.lists),
+                    ("Media", &mut options.media),
+                    ("Likes", &mut options.likes),
+                ];
+                for (idx, (name, _)) in items.iter().enumerate() {
+                    println!("[{}]: {name}", idx + 1);
+                }
+                let mut opt = String::new();
+                std::io::stdin().read_line(&mut opt).unwrap();
+                let components = opt.split_ascii_whitespace();
+                for item in components {
+                    let stripped = item.trim();
+                    let mut parsed: usize = match stripped.parse() {
+                        Ok(n) => n,
+                        Err(_) => {
+                            println!("Invalid entry \"{stripped}\", please try again");
+                            continue 'outer;
+                        }
+                    };
+                    parsed -= 1;
+                    let Some((_, pointer)) = items.get_mut(parsed) else {
+                            println!("Unknown Number {stripped}, please try again");
+                            continue 'outer;
+                    };
+                    **pointer = true;
+                }
+
+                config.config_data.crawl_options = options;
+
+                break;
+            }
+
             config.config_data.write(custom_path.clone())?;
+
             Ok(config)
         }
     }
@@ -299,6 +345,20 @@ pub struct CrawlOptions {
 }
 
 impl CrawlOptions {
+    pub fn disabled() -> Self {
+        Self {
+            tweets: false,
+            tweet_responses: false,
+            tweet_profiles: false,
+            mentions: false,
+            followers: false,
+            follows: false,
+            lists: false,
+            media: false,
+            likes: false,
+        }
+    }
+
     pub fn changed(&self, change: impl FnOnce(&mut Self)) -> Self {
         let mut copy = self.clone();
         change(&mut copy);
