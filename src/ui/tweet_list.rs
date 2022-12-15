@@ -47,7 +47,7 @@ pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
                 "{cx.props.label}"
             }
             button {
-                class: "btn btn-info ms-auto",
+                class: "btn btn-outline-info ms-auto",
                 r#type: "button",
                 onclick: move |_| {
                     page.set(page_size);

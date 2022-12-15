@@ -31,7 +31,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                         media: storage.resolver(),
                         label: label,
                         user: &storage.data().profile,
-                        responses: &storage.data().responses
+                        responses: &storage.data().responses,
                     }
                 }
             }
@@ -47,7 +47,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                         media: storage.resolver(),
                         label: label.clone(),
                         user: &storage.data().profile,
-                        responses: &storage.data().responses
+                        responses: &storage.data().responses,
                     }
                 }
             }

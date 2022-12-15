@@ -22,11 +22,76 @@ pub struct TweetProps<'a> {
 
 pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
     let tweet = cx.props.tweet;
+
+    let user = tweet.user.as_deref().unwrap_or(cx.props.user);
+
+    let column2 = use_atom_state(&cx, COLUMN2);
+
     let date = tweet.created_at.format("%d/%m/%Y %H:%M").to_string();
+
+    let pure_text = &tweet.text;
 
     let text = formatted_tweet(tweet);
 
     let media = crate::helpers::media_in_tweet(tweet);
+
+    let modal_id = format!("modal-{}", tweet.id);
+
+    // we can only delete our own tweets
+    let can_delete = cx.props.user.id == user.id;
+
+    let action_dropdown = rsx! {
+        div {
+            class: "dropdown",
+            button {
+                "aria-expanded": "false",
+                "data-bs-toggle": "dropdown",
+                style: "font-weight: bold; --bs-btn-padding-y: .1rem; --bs-btn-padding-x: .3rem; --bs-btn-font-size: .95rem;",
+                class: "btn btn-outline-secondary drowdopwn-toggle",
+                r#type: "button",
+                " \u{2807}"
+            }
+            ul {
+                class: "dropdown-menu",
+                li {
+                    a {
+                        class: "dropdown-item fs-6",
+                        href: "https://twitter.com/{user.screen_name}/status/{tweet.id}",
+                        "Open on Twitter"
+                    }
+                }
+                li {
+                    a {
+                        class: "dropdown-item",
+                        href: "https://twitter.com/{user.screen_name}",
+                        "Open Author on Twitter"
+                    }
+                }
+                li {
+                    a {
+                        class: "dropdown-item",
+                        onclick: move |_| column2.set(ColumnState::Profile(user.id)),
+                        "Go to Author"
+                    }
+                }
+                li {
+                    hr {
+                        class: "dropdown-divider"
+                    }
+                }
+                { can_delete.then(|| rsx!(li {
+                    button {
+                        class: "dropdown-item btn btn-danger text-danger",
+                        r#type: "button",
+                        "data-bs-toggle": "modal",
+                        "data-bs-target": "#{modal_id}",
+                        "Delete on Twitter"
+                    }
+                })) }
+            }
+        }
+    };
+    let modal_id = format!("modal-{}", tweet.id);
 
     let image = media
         .as_ref()
@@ -76,8 +141,6 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
         })
         .unwrap_or_else(|| rsx!(div {}));
 
-    let user = tweet.user.as_deref().unwrap_or(cx.props.user);
-
     let user_image = tweet
         .user
         .as_ref()
@@ -89,23 +152,24 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
         })
         .unwrap_or_else(|| rsx!(div {}));
 
-    let column2 = use_atom_state(&cx, COLUMN2);
-
     let tweet_info = rsx!(
         div {
-            class: "card-title",
-            onclick: move |_| column2.set(ColumnState::Profile(user.id)),
+            class: "card-title d-flex flex-row justify-content-between align-items-center",
+            style: "font-size: 13px; gap: 5px;",
             strong {
                 class: "text-dark",
+                onclick: move |_| column2.set(ColumnState::Profile(user.id)),
                 "{user.name}"
             }
-            " "
-            "@{user.screen_name}"
-            " "
             span {
-                class: "text-muted",
+                onclick: move |_| column2.set(ColumnState::Profile(user.id)),
+                "@{user.screen_name}"
+            }
+            span {
+                class: "text-muted me-auto",
                 "{date}"
             }
+            action_dropdown
         }
     );
 
@@ -120,23 +184,21 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
     });
 
     let tweet_actions = rsx!(div {
-        span {
-            class: "text-success",
-            "{tweet.favorite_count} Likes"
-        }
-        " "
-        span {
-            class: "text-success",
-            "{tweet.retweet_count} Retweets"
-        }
-        " "
-        tweet_responses
-        " "
-        a {
-            class: "btn btn-info btn-sm",
-            href: "https://twitter.com/{user.screen_name}/status/{tweet.id}",
-            "Open on Twitter"
-        }
+        style: "margin-bottom: 8px;",
+        small {
+            span {
+                class: "text-success",
+                "{tweet.favorite_count} Likes"
+            }
+            " "
+            span {
+                class: "text-success",
+                "{tweet.retweet_count} Retweets"
+            }
+            " "
+            tweet_responses
+            " "
+            }
     });
 
     let quoted = tweet
@@ -176,6 +238,54 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                     quoted
                     video
                     image
+                }
+            }
+            div {
+                class: "modal",
+                "data-bs-backdrop": "false",
+                id: "{modal_id}",
+                div {
+                    class: "modal-dialog",
+                    div {
+                        class: "modal-content",
+                        div {
+                            class: "modal-body",
+                            "Do you really want to delete this tweet?"
+                            div {
+                                class: "hstack gap-2",
+                                div {
+                                    class: "vr"
+                                }
+                                p {
+                                    small {
+                                        em {
+                                            "{pure_text}"
+                                        }
+                                    }
+                                }
+                            }
+                            div {
+                                class: "alert alert-warning",
+                                "The tweet will be deleted on Twitter but will still be available in this archive."
+                            }
+                        }
+                        div {
+                            class: "modal-footer",
+                            button {
+                                class: "btn btn-secondary",
+                                "data-bs-dismiss": "modal",
+                                r#type: "button",
+                                "Don't delete"
+                            }
+                            button {
+                                class: "btn btn-danger",
+                                "data-bs-dismiss": "modal",
+                                r#type: "button",
+                                onclick: move |_| println!("DELETE"),
+                                "Yes, delete please"
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -235,3 +345,5 @@ fn formatted_tweet(tweet: &Tweet) -> String {
 
     output
 }
+
+// This could certainly be placed some

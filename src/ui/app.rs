@@ -3,6 +3,7 @@ use std::cell::Cell;
 
 use dioxus::desktop::tao::dpi::LogicalSize;
 use dioxus::desktop::tao::window::WindowBuilder;
+use dioxus::desktop::use_window;
 use dioxus::prelude::*;
 
 use crate::config::Config;
@@ -113,16 +114,32 @@ fn App(cx: Scope<AppProps>) -> Element {
 
     let style_html = style_html();
 
+    let desktop = use_window(&cx).clone();
+
+    let script = r#"
+    var script = document.createElement("script");
+    script.type = "application/javascript";
+    // loading the js into a `script` container did not work. So for now a link to the CDN
+    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js";
+    document.head.appendChild(script);
+    "#;
+
+    use_future(&cx, (), |_| async move {
+        time_sleep(1000).await;
+        desktop.eval(script);
+    });
+
     rsx!(cx, main {
         class: "{main_class}",
-        div {
-            dangerous_inner_html: "{style_html}"
-        }
         is_loaded.then(|| rsx!(header {
             HeaderComponent {}
         })),
 
         view
+
+        div {
+            dangerous_inner_html: "{style_html}"
+        }
     })
 }
 
@@ -183,4 +200,8 @@ const fn style_html() -> &'static str {
         include_str!("../assets/bootstrap.min.css"),
         "</style>"
     )
+}
+
+async fn time_sleep(interval: usize) {
+    tokio::time::sleep(tokio::time::Duration::from_millis(interval as u64)).await;
 }
