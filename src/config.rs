@@ -53,9 +53,7 @@ impl Config {
     /// The default storage path *or* the custom path which
     /// a user can set at runtime
     pub fn storage_path(custom: Option<PathBuf>) -> PathBuf {
-        custom
-            .unwrap_or_else(|| data_directory())
-            .join(ARCHIVE_PATH)
+        custom.unwrap_or_else(data_directory).join(ARCHIVE_PATH)
     }
 
     /// The path to the config file which is within
@@ -113,8 +111,8 @@ impl Config {
     fn keypair() -> KeyPair {
         // somehow dotenv and dotenvy doesn't behave as expected. need to look into it:
         // https://github.com/dotenv-rs/dotenv/issues/71
-        let consumer_key = obfstr::obfstr!(dotenv!("API_KEY")).trim().to_string();
-        let consumer_secret = obfstr::obfstr!(dotenv!("API_SECRET")).trim().to_string();
+        let consumer_key = obfstr::obfstr!(env!("API_KEY")).trim().to_string();
+        let consumer_secret = obfstr::obfstr!(env!("API_SECRET")).trim().to_string();
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }

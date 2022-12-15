@@ -45,7 +45,7 @@ pub fn SecondaryColumn(
                         label: label,
                         user: &storage.data().profile,
                         responses: &storage.data().responses,
-                        config: &config
+                        config: config
                     }
                 }
             }
@@ -62,7 +62,7 @@ pub fn SecondaryColumn(
                         media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label
-                        config: &config
+                        config: config
                     }
                 }
             }
@@ -77,7 +77,7 @@ pub fn SecondaryColumn(
                         AuthorComponent {
                             profile: profile,
                             media: storage.resolver(),
-                            config: &config
+                            config: config
                         }
                     }
                 }
@@ -110,7 +110,7 @@ pub fn SecondaryColumn(
                             media: storage.resolver(),
                             user: &storage.data().profile,
                             responses: None,
-                            config: &config
+                            config: config
                         }
                     }
                 }

@@ -3,7 +3,6 @@
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
-use tracing::info;
 
 use crate::config::Config;
 use crate::crawler::DownloadInstruction;

@@ -1,6 +1,5 @@
 use crate::{config::Config, crawler::DownloadInstruction};
 use egg_mode::tweet::Tweet;
-use futures::TryFutureExt;
 use tracing::warn;
 
 pub fn media_in_tweet(tweet: &Tweet) -> Option<Vec<DownloadInstruction>> {
