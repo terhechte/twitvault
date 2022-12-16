@@ -38,7 +38,10 @@ pub fn AuthorListComponent<'a>(cx: Scope<'a, AuthorListProps>) -> Element<'a> {
     });
 
     cx.render(rsx!(div {
-        h5 { "{cx.props.label}" }
+        h5 {
+            style: "margin-top: 10px; margin-bottom: 5px; margin-left: 15px; font-weight: bold; color: slategray;",
+            "{cx.props.label}"
+        }
         profiles_rendered
         ShowMoreButton {
             visible: has_more,

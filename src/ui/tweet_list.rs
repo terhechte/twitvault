@@ -47,6 +47,7 @@ pub fn TweetListComponent<'a>(cx: Scope<'a, TweetListProps>) -> Element<'a> {
         div {
             class: "hstack gap-3",
             h5 {
+                style: "margin-top: 10px; margin-bottom: 5px; margin-left: 15px; font-weight: bold; color: slategray;",
                 "{cx.props.label}"
             }
             button {

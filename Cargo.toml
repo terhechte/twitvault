@@ -44,3 +44,7 @@ webbrowser = "0.6.0"
 regex = "1.7.0"
 chrono = "0.4.23"
 directories-next = "2.0.0"
+dioxus-heroicons = "0.1.4"
+
+[patch.crates-io]
+dioxus = { git = "https://github.com/terhechte/dioxus", branch = "argh" }

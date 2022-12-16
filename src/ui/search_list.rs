@@ -29,10 +29,6 @@ pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
     cx.render(rsx!(div {
         div {
             class: "mb-3",
-            label {
-                class: "form-label",
-                "Search"
-            }
             form {
                 onsubmit: move |evt| {
                     search_term.set(evt.values["term"].to_string());
@@ -49,7 +45,7 @@ pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
                     name: "term",
                 }
                 div {
-                    class: "m-3",
+                    class: "m-2",
                     Checkbox {
                         label: "Tweets",
                         name: "tweets"
@@ -61,6 +57,13 @@ pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
                         name: "mentions"
                         checked: filters.mentions,
                         onclick: move |_| filters.set(filters.get().change(|s| s.mentions = !s.mentions))
+                    }
+
+                    Checkbox {
+                        label: "Likes",
+                        name: "likes"
+                        checked: filters.likes,
+                        onclick: move |_| filters.set(filters.get().change(|s| s.likes = !s.likes))
                     }
 
                     Checkbox {
@@ -83,8 +86,8 @@ pub fn SearchComponent(cx: Scope, storage: StorageWrapper) -> Element<'a> {
                     data: v,
                 }),
                 Some(None) => rsx!(div {
-                    class: "alert",
-                    h3 {
+                    h6 {
+                        class: "text-center text-secondary",
                         "No results found"
                     }
                 }),
@@ -115,6 +118,7 @@ fn Checkbox<'a>(
             id: "{name}"
         }
         label {
+            style: "font-size: 13px;",
             class: "form-check-label",
             r#for: "{name}",
             "{label}"

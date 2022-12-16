@@ -65,13 +65,13 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
         .and_then(|(url, s)| url.domain().map(|e| (e.to_string(), s)))
         .map(|(domain, url)| {
             rsx!(a {
-                class: "btn btn-primary",
+                class: "btn btn-secondary btn-sm",
                 href: "{url}",
                 "Link: {domain}"
             })
         });
     let twitter_button = rsx!(a {
-        class: "btn btn-primary",
+        class: "btn btn-secondary btn-sm",
         href: "https://twitter.com/{author.screen_name}",
         "On Twitter"
     });

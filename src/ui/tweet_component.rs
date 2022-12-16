@@ -2,6 +2,8 @@
 
 use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
+use dioxus_heroicons::solid::Shape;
+use dioxus_heroicons::Icon;
 use egg_mode::user::TwitterUser;
 
 use crate::config::Config;
@@ -60,9 +62,13 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
                 "aria-expanded": "false",
                 "data-bs-toggle": "dropdown",
                 style: "font-weight: bold; --bs-btn-padding-y: .1rem; --bs-btn-padding-x: .3rem; --bs-btn-font-size: .95rem;",
-                class: "btn btn-outline-secondary drowdopwn-toggle",
+                class: "btn btn-secondary drowdopwn-toggle",
                 r#type: "button",
-                " \u{2807}"
+                Icon {
+                    size: 15,
+                    icon: Shape::DotsVertical,
+                    fill: "white"
+                }
             }
             ul {
                 class: "dropdown-menu",
@@ -149,11 +155,14 @@ pub fn TweetComponent<'a>(cx: Scope<'a, TweetProps>) -> Element<'a> {
         .map(|entry| {
             let clone = entry.clone();
             rsx!( div {
-                class: "ratio ratio-16x9",
-                video {
-                    controls: "true",
-                    source {
-                        src: "{entry}"
+                class: "vstack text-center",
+                div {
+                    class: "ratio ratio-16x9",
+                    video {
+                        controls: "true",
+                        source {
+                            src: "{entry}"
+                        }
                     }
                 }
                 small {
