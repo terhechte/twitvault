@@ -19,7 +19,10 @@ pub fn ListListComponent<'a>(cx: Scope<'a, ListListProps>) -> Element<'a> {
         .map(|list| cx.render(rsx!(ListComponent { list: list })));
 
     cx.render(rsx!(div {
-        h5 { "Lists" }
+        h5 { 
+            style: "margin-top: 10px; margin-bottom: 5px; margin-left: 15px; font-weight: bold; color: slategray;",
+            "Lists" 
+        }
         lists_rendered
     }
     ))

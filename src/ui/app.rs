@@ -2,7 +2,9 @@
 use std::cell::Cell;
 
 use dioxus::desktop::tao::dpi::LogicalSize;
+use dioxus::desktop::tao::platform::macos::WindowBuilderExtMacOS;
 use dioxus::desktop::tao::window::WindowBuilder;
+use dioxus::desktop::use_window;
 use dioxus::prelude::*;
 
 use crate::config::Config;
@@ -14,8 +16,6 @@ use super::main_component::MainComponent;
 use super::setup_component::SetupComponent;
 use super::types::{LoadingState, StorageWrapper};
 
-pub const TWATVAULT_ICON: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-box2-heart" viewBox="0 0 16 16"><path d="M8 7.982C9.664 6.309 13.825 9.236 8 13 2.175 9.236 6.336 6.31 8 7.982Z"/><path d="M3.75 0a1 1 0 0 0-.8.4L.1 4.2a.5.5 0 0 0-.1.3V15a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V4.5a.5.5 0 0 0-.1-.3L13.05.4a1 1 0 0 0-.8-.4h-8.5Zm0 1H7.5v3h-6l2.25-3ZM8.5 4V1h3.75l2.25 3h-6ZM15 5v10H1V5h14Z"/></svg>"#;
-
 pub fn run_ui(storage: Option<Storage>, config: Option<Config>) {
     dioxus::desktop::launch_with_props(
         App,
@@ -24,8 +24,18 @@ pub fn run_ui(storage: Option<Storage>, config: Option<Config>) {
             config: Cell::new(config),
         },
         |c| {
-            c.with_window(default_menu)
-                .with_window(|w| w.with_title("TwitVault"))
+            c.with_window(default_menu).with_window(|w| {
+                #[cfg(target_os = "macos")]
+                {
+                    w.with_titlebar_transparent(false)
+                        .with_title_hidden(false)
+                        .with_title("TwitVault")
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    w.with_title("TwitVault")
+                }
+            })
         },
     );
 }
@@ -113,16 +123,28 @@ fn App(cx: Scope<AppProps>) -> Element {
 
     let style_html = style_html();
 
+    let desktop = use_window(&cx).clone();
+
+    let script = r#"
+    var script = document.createElement("script");
+    script.type = "application/javascript";
+    // loading the js into a `script` container did not work. So for now a link to the CDN
+    script.src = "https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js";
+    document.head.appendChild(script);
+    "#;
+
+    use_future(&cx, (), |_| async move {
+        time_sleep(1000).await;
+        desktop.eval(script);
+    });
+
     rsx!(cx, main {
         class: "{main_class}",
+        view
+
         div {
             dangerous_inner_html: "{style_html}"
         }
-        is_loaded.then(|| rsx!(header {
-            HeaderComponent {}
-        })),
-
-        view
     })
 }
 
@@ -142,25 +164,6 @@ fn default_menu(builder: WindowBuilder) -> WindowBuilder {
         .with_title("TwitVault")
         .with_menu(menu_bar_menu)
         .with_inner_size(s)
-}
-
-fn HeaderComponent(cx: Scope) -> Element {
-    cx.render(rsx!(nav {
-        class: "navbar navbar-expand-lg navbar-dark bg-dark",
-        div {
-            class: "container-fluid",
-            span {
-                class: "navbar-brand",
-                i {
-                    class: "bi",
-                    dangerous_inner_html: "{TWATVAULT_ICON}"
-                }
-                small {
-                    " TwitVault"
-                }
-            }
-        }
-    }))
 }
 
 #[derive(Props)]
@@ -183,4 +186,8 @@ const fn style_html() -> &'static str {
         include_str!("../assets/bootstrap.min.css"),
         "</style>"
     )
+}
+
+async fn time_sleep(interval: usize) {
+    tokio::time::sleep(tokio::time::Duration::from_millis(interval as u64)).await;
 }

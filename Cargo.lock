@@ -589,6 +589,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dioxus-heroicons"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e79acb735e2e1389e62cc472a88d0dde9761160ff104cbca48e016631185214"
+dependencies = [
+ "dioxus",
+]
+
+[[package]]
 name = "dioxus-hooks"
 version = "0.2.1"
 source = "git+https://github.com/terhechte/dioxus?branch=argh#2521c1a2f3899ced874a249d721fc179a40d3860"
@@ -2740,11 +2749,12 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "twitvault"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "chrono",
  "clap",
  "dioxus",
+ "dioxus-heroicons",
  "directories-next",
  "dotenvy_macro",
  "egg-mode",

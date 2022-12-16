@@ -45,7 +45,7 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
         let current = (*login_state.current()).clone();
         async move {
             match current {
-                LoginState::Initial => RequestData::request()
+                LoginState::Initial => RequestData::request(None)
                     .await
                     .map(LoginStateResult::RequestData)
                     .unwrap_or_else(|e| LoginStateResult::Error(e.to_string())),
@@ -79,24 +79,6 @@ pub fn LoginComponent(cx: Scope, loading_state: UseState<LoadingState>) -> Eleme
                 "Once you give access, you will see a pin-code. Enter it here to proceed to the next step"
             }
 
-            div {
-                class: "card text-bg-light mb-3",
-                div {
-                    class: "card-header",
-                    "Note:"
-                }
-                div {
-                    class: "card-body",
-                    p {
-                        class: "card-text",
-                        "The app is called "
-                        strong {
-                            "SwiftWatch "
-                        }
-                        "because I can't access the Twitter Dashboard. This is the only API Key I have"
-                    }
-                }
-            }
             NextButton {
                 title: "Next",
                 kind: "button",

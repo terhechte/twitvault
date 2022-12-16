@@ -33,6 +33,7 @@ pub struct Options {
     pub mentions: bool,
     pub responses: bool,
     pub profiles: bool,
+    pub likes: bool,
 }
 
 impl Options {
@@ -50,6 +51,7 @@ impl Default for Options {
             mentions: true,
             responses: true,
             profiles: true,
+            likes: true,
         }
     }
 }
@@ -65,6 +67,9 @@ pub fn search(term: String, data: &Data, options: Options) -> Vec<SearchResult> 
     }
     if options.mentions {
         search_tweets(&regex, &data.mentions, &mut results);
+    }
+    if options.likes {
+        search_tweets(&regex, &data.likes, &mut results);
     }
     if options.responses {
         for i in data.responses.values() {

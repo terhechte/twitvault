@@ -12,12 +12,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::Hasher;
 use std::io::Write;
 use std::time::SystemTime;
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-    str::FromStr,
-    sync::Arc,
-};
+use std::{collections::HashSet, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::{
     mpsc::{channel, Sender},
     Mutex,
@@ -32,33 +27,39 @@ use crate::config::Config;
 /// Internal messaging between the different threads
 #[derive(Debug)]
 pub enum DownloadInstruction {
+    /// Download an image
     Image(String),
+    /// Download a Movie
     Movie(mime::Mime, String),
+    /// Download the media of a profile
     ProfileMedia(String),
+    /// Tells the thread to close as all the crawling finished
     Done,
 }
 
 pub async fn crawl_new_storage(
     config: Config,
-    storage_path: &Path,
     message_sender: Sender<Message>,
+    user_id: u64,
 ) -> Result<()> {
-    let Ok(user_container) = egg_mode::user::lookup([config.user_id()], &config.token).await else { bail!("Could not find user") };
+    let storage_path = config.actual_storage_path();
+    let Ok(user_container) = egg_mode::user::lookup([user_id], &config.token).await else { bail!("Could not find user") };
     let Some(user) = user_container.response.first() else { bail!("Empty User Response") };
     let mut storage = Storage::new(user.clone(), storage_path)?;
     storage.with_data(|d| {
         d.profiles.insert(user.id, user.clone());
     });
-    crawl_into_storage(config, storage, message_sender).await
+    crawl_into_storage(user_id, config, storage, message_sender).await
 }
 
 pub async fn crawl_into_storage(
+    user_id: u64,
     config: Config,
     storage: Storage,
     sender: Sender<Message>,
 ) -> Result<()> {
     let crawl_task = tokio::spawn(async move {
-        match fetch(&config, storage, sender.clone()).await {
+        match fetch(user_id, &config, storage, sender.clone()).await {
             Ok(_) => {
                 println!("crawl_task done");
             }
@@ -106,8 +107,12 @@ async fn msg(msg: impl AsRef<str>, sender: &Sender<Message>) {
     }
 }
 
-async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Result<()> {
-    let user_id = storage.data().profile.id;
+async fn fetch(
+    user_id: u64,
+    config: &Config,
+    storage: Storage,
+    sender: Sender<Message>,
+) -> Result<()> {
     let shared_storage = Arc::new(Mutex::new(storage));
 
     async fn save_data(storage: &Arc<Mutex<Storage>>) {
@@ -120,7 +125,7 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         create_instruction_handler(config.crawl_options().media, shared_storage.clone());
 
     fetch_single_profile(
-        config.user_id(),
+        user_id,
         shared_storage.clone(),
         config,
         instruction_sender.clone(),
@@ -139,8 +144,26 @@ async fn fetch(config: &Config, storage: Storage, sender: Sender<Message>) -> Re
         save_data(&shared_storage).await;
     }
 
+    // If we're not crawling for the authenticated user
+    // we can't crawl mentions
     if config.crawl_options().mentions {
-        fetch_user_mentions(
+        if config.user_id() != user_id {
+            info!("Can't crawl mentions for custom-user");
+        } else {
+            fetch_user_mentions(
+                shared_storage.clone(),
+                config,
+                instruction_sender.clone(),
+                sender.clone(),
+            )
+            .await?;
+            save_data(&shared_storage).await;
+        }
+    }
+
+    if config.crawl_options().likes {
+        fetch_user_likes(
+            user_id,
             shared_storage.clone(),
             config,
             instruction_sender.clone(),
@@ -317,6 +340,71 @@ async fn fetch_user_mentions(
         s.data_mut().mentions.splice(0..0, collected);
     } else {
         s.data_mut().mentions.append(&mut collected);
+    }
+
+    config.set_paging_position("user_mentions", None);
+
+    Ok(())
+}
+
+async fn fetch_user_likes(
+    id: u64,
+    shared_storage: Arc<Mutex<Storage>>,
+    config: &Config,
+    sender: Sender<DownloadInstruction>,
+    message_sender: Sender<Message>,
+) -> Result<()> {
+    let label = "User Likes";
+    msg(label, &message_sender).await;
+    let mut timeline = tweet::liked_by(id, &config.token).with_page_size(200);
+
+    let mut first_page = config.paging_position("user_likes");
+
+    let first_id = shared_storage.lock().await.data().likes.first().cloned();
+    let is_sync = config.is_sync;
+
+    let mut collected = Vec::new();
+
+    'outer: loop {
+        tracing::info!("Downloading Likes before {:?}", timeline.min_id);
+        let (next_timeline, mut feed) = timeline.older(first_page).await?;
+        first_page = None;
+        if feed.response.is_empty() {
+            break;
+        }
+        for tweet in feed.response.iter() {
+            // In this case, we know the tweet and we stop loading further
+            if is_sync && Some(tweet.id) == first_id.as_ref().map(|e| e.id) {
+                break 'outer;
+            }
+            inspect_tweet(
+                tweet,
+                shared_storage.clone(),
+                config,
+                &sender,
+                &message_sender,
+            )
+            .await?;
+        }
+        collected.append(&mut feed.response);
+
+        handle_rate_limit(
+            &feed.rate_limit_status,
+            "User Likes",
+            message_sender.clone(),
+        )
+        .await;
+        timeline = next_timeline;
+        config.set_paging_position("user_likes", timeline.min_id);
+
+        msg(format!("{label}: {}", collected.len()), &message_sender).await;
+    }
+
+    let mut s = shared_storage.lock().await;
+    if is_sync {
+        s.data_mut().likes.splice(0..0, collected);
+    } else {
+        s.data_mut().likes.append(&mut collected);
     }
 
     config.set_paging_position("user_mentions", None);
@@ -678,7 +766,8 @@ pub async fn inspect_tweet(
     }
 
     if config.crawl_options().tweet_responses {
-        // for our own tweets, we search for responses
+        // for our own tweets, we search for responses.
+        // but only if we don't have a custom-user
         if tweet.user.is_none() || tweet.user.as_ref().map(|e| e.id) == Some(config.user_id()) {
             if let Err(e) =
                 fetch_tweet_replies(tweet, storage.clone(), config, sender, message_sender).await

@@ -30,6 +30,8 @@ pub struct Config {
     /// Remember the paging positions for the different endpoints,
     /// so that restarting the crawler will continue where it left off.
     paging_positions: Arc<Mutex<PagingPositions>>,
+    /// If this is a config for a custom path
+    custom_path: Option<PathBuf>,
 }
 
 impl PartialEq for Config {
@@ -41,12 +43,28 @@ impl PartialEq for Config {
 impl Eq for Config {}
 
 impl Config {
-    pub fn storage_path() -> PathBuf {
-        data_directory().join(ARCHIVE_PATH)
+    /// The storage path for a given initialized config.
+    /// will include a `custom path` if that has been
+    /// set by the user at runtime
+    pub fn actual_storage_path(&self) -> PathBuf {
+        Self::storage_path(self.custom_path.clone())
     }
 
-    pub fn config_path() -> PathBuf {
-        data_directory().join(SETTINGS_FILE)
+    /// The default storage path *or* the custom path which
+    /// a user can set at runtime
+    pub fn storage_path(custom: Option<PathBuf>) -> PathBuf {
+        custom.unwrap_or_else(|| data_directory().join(ARCHIVE_PATH))
+    }
+
+    /// The path to the config file which is within
+    /// the `storage_path`
+    pub fn config_path(custom: Option<PathBuf>) -> PathBuf {
+        Config::storage_path(custom).join(SETTINGS_FILE)
+    }
+
+    /// The path to the paging file
+    pub fn paging_path(custom: Option<PathBuf>) -> PathBuf {
+        Config::storage_path(custom).join(PAGING_FILE)
     }
 
     pub fn screen_name(&self) -> &str {
@@ -78,12 +96,13 @@ impl Config {
         } else {
             lock.remove(key);
         }
-        let Ok(f) = std::fs::File::create(PAGING_FILE) else {
-            warn!("Could not create / save {PAGING_FILE}");
+        let paging_path = Config::paging_path(self.custom_path.clone());
+        let Ok(f) = std::fs::File::create(paging_path.clone()) else {
+            warn!("Could not create / save {}", &paging_path.display());
             return
         };
         if let Err(e) = serde_json::to_writer(f, &(*lock)) {
-            warn!("Could not serialize {PAGING_FILE}: {e:?}");
+            warn!("Could not serialize {}: {e:?}", &paging_path.display());
         }
     }
 }
@@ -97,14 +116,33 @@ impl Config {
 
         egg_mode::KeyPair::new(consumer_key, consumer_secret)
     }
-    pub fn open() -> Result<Self> {
+    pub fn open(custom_path: Option<PathBuf>) -> Result<Self> {
         let con_token = Self::keypair();
 
         let (token, config_data, paging_positions) = {
-            let path = Config::config_path();
+            // if we can't find the path in the archive (default),
+            // then try in the parent directory (backwards compatibility)
+            let mut path = Config::config_path(custom_path.clone());
+            if !path.exists() {
+                let old_path = Config::storage_path(custom_path.clone())
+                    .parent()
+                    .map(|e| e.to_owned())
+                    .ok_or(eyre::eyre!("No root folder for storage path"))?;
+                let old_config_path = old_path.join(SETTINGS_FILE);
+                if old_config_path.exists() {
+                    path = old_config_path;
+                } else {
+                    bail!(
+                        "Could not find config file in either {} or {}",
+                        path.display(),
+                        old_config_path.display()
+                    )
+                }
+            }
             let fp = std::fs::File::open(path)?;
             let config_data: ConfigData = serde_json::from_reader(fp)?;
-            let paging_positions: PagingPositions = std::fs::File::open(PAGING_FILE)
+            let paging_path = Self::paging_path(custom_path.clone());
+            let paging_positions: PagingPositions = std::fs::File::open(paging_path)
                 .map_err(|e| eyre::eyre!("{e:?}"))
                 .and_then(|e| serde_json::from_reader(e).map_err(|e| eyre::eyre!("{e:?}")))
                 .unwrap_or_default();
@@ -124,6 +162,7 @@ impl Config {
             config_data,
             paging_positions: Arc::new(Mutex::new(paging_positions)),
             is_sync: false,
+            custom_path,
         })
     }
 
@@ -133,22 +172,22 @@ impl Config {
             .map(|_| ())?)
     }
 
-    pub async fn load() -> Result<Self> {
-        let a1 = Config::load_inner().await;
+    pub async fn load(custom_path: Option<PathBuf>) -> Result<Self> {
+        let a1 = Config::load_inner(custom_path.clone()).await;
         if let Ok(conf) = a1 {
             return Ok(conf);
         }
 
-        Config::load_inner().await
+        Config::load_inner(custom_path).await
     }
 
-    async fn load_inner() -> Result<Self> {
-        if let Ok(config) = Self::open() {
+    async fn load_inner(custom_path: Option<PathBuf>) -> Result<Self> {
+        if let Ok(config) = Self::open(custom_path.clone()) {
             if let Err(err) = config.verify().await {
                 println!("We've hit an error using your old tokens: {:?}", err);
                 println!("We'll have to reauthenticate before continuing.");
                 println!("Last Paging Positions");
-                let path = Config::config_path();
+                let path = Config::config_path(custom_path.clone());
                 std::fs::remove_file(path).unwrap();
                 bail!("Please Relogin")
             } else {
@@ -157,17 +196,63 @@ impl Config {
             Ok(config)
         } else {
             println!("Request Token");
-            let request_data = RequestData::request().await?;
+            let request_data = RequestData::request(custom_path.clone()).await?;
 
-            println!("Go to the following URL, sign in, and give me the PIN that comes back:");
+            println!(
+                "Go to the following URL, sign in, and paste the PIN here and hit enter / return"
+            );
             println!("{}", request_data.authorize_url);
 
             let mut pin = String::new();
             std::io::stdin().read_line(&mut pin).unwrap();
             println!();
 
-            let config = request_data.validate(&pin).await?;
-            config.config_data.write()?;
+            let mut config = request_data.validate(&pin).await?;
+
+            'outer: loop {
+                println!("Which data do you intend to crawl? Please enter space-seperated numbers and hit enter / return:");
+                let mut options = CrawlOptions::default();
+                let mut items = [
+                    ("Tweets", &mut options.tweets),
+                    ("Responses", &mut options.tweet_responses),
+                    ("Tweet Profiles", &mut options.tweet_profiles),
+                    ("Mentions", &mut options.mentions),
+                    ("Followers", &mut options.followers),
+                    ("Follows", &mut options.follows),
+                    ("Lists", &mut options.lists),
+                    ("Media", &mut options.media),
+                    ("Likes", &mut options.likes),
+                ];
+                for (idx, (name, _)) in items.iter().enumerate() {
+                    println!("[{}]: {name}", idx + 1);
+                }
+                let mut opt = String::new();
+                std::io::stdin().read_line(&mut opt).unwrap();
+                let components = opt.split_ascii_whitespace();
+                for item in components {
+                    let stripped = item.trim();
+                    let mut parsed: usize = match stripped.parse() {
+                        Ok(n) => n,
+                        Err(_) => {
+                            println!("Invalid entry \"{stripped}\", please try again");
+                            continue 'outer;
+                        }
+                    };
+                    parsed -= 1;
+                    let Some((_, pointer)) = items.get_mut(parsed) else {
+                            println!("Unknown Number {stripped}, please try again");
+                            continue 'outer;
+                    };
+                    **pointer = true;
+                }
+
+                config.config_data.crawl_options = options;
+
+                break;
+            }
+
+            config.config_data.write(custom_path.clone())?;
+
             Ok(config)
         }
     }
@@ -178,10 +263,11 @@ pub struct RequestData {
     request_token: KeyPair,
     pub authorize_url: String,
     user_pin: String,
+    custom_path: Option<PathBuf>,
 }
 
 impl RequestData {
-    pub async fn request() -> Result<Self> {
+    pub async fn request(custom_path: Option<PathBuf>) -> Result<Self> {
         let con_token = Config::keypair();
         let request_token = egg_mode::auth::request_token(&con_token, "oob").await?;
         let authorize_url = egg_mode::auth::authorize_url(&request_token);
@@ -190,6 +276,7 @@ impl RequestData {
             request_token,
             authorize_url,
             user_pin: String::new(),
+            custom_path,
         })
     }
 
@@ -212,13 +299,14 @@ impl RequestData {
             _ => bail!("Invalid Token Type {token:?}"),
         };
 
-        config_data.write()?;
+        config_data.write(self.custom_path.clone())?;
 
         Ok(Config {
             token,
             config_data,
             paging_positions: Default::default(),
             is_sync: false,
+            custom_path: self.custom_path.clone(),
         })
     }
 }
@@ -251,9 +339,26 @@ pub struct CrawlOptions {
     pub lists: bool,
     /// Download media from tweets and profiles
     pub media: bool,
+    /// Download the liked tweets and profiles for a user
+    #[serde(default)]
+    pub likes: bool,
 }
 
 impl CrawlOptions {
+    pub fn disabled() -> Self {
+        Self {
+            tweets: false,
+            tweet_responses: false,
+            tweet_profiles: false,
+            mentions: false,
+            followers: false,
+            follows: false,
+            lists: false,
+            media: false,
+            likes: false,
+        }
+    }
+
     pub fn changed(&self, change: impl FnOnce(&mut Self)) -> Self {
         let mut copy = self.clone();
         change(&mut copy);
@@ -272,13 +377,14 @@ impl Default for CrawlOptions {
             follows: true,
             lists: false,
             media: true,
+            likes: true,
         }
     }
 }
 
 impl ConfigData {
-    fn write(&self) -> Result<()> {
-        let path = Config::config_path();
+    fn write(&self, custom_path: Option<PathBuf>) -> Result<()> {
+        let path = Config::config_path(custom_path);
         let f = std::fs::File::create(&path)?;
         serde_json::to_writer(f, &self)?;
         Ok(())

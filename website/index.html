@@ -137,42 +137,32 @@
             </section>
             <section>
                 <h2>Features</h2>
+
                 <ul>
                     <li>Import Tweets from an existing Twitter archive (see below)</li>
+                    <li>For any Tweet, also optionally archive the author and the authors profile media</li>
                     <li>Archive your tweets.</li>
-                    <ul>
-                        <li>Optionally including respones to your tweets</li>
-                        <li>Optionally including tweet media (videos, images)</li>
-                    </ul>
+                    <li>Optionally including respones to your tweets</li>
                     <li>Archive your mentions.</li>
-                    <ul>
-                        <li>Optionally including user profiles</li>
-                        <li>Optionally including profile images</li>
-                    </ul>
                     <li>Follows and Followers</li>
                     <ul>
                         <li>Optionally including user profiles</li>
                         <li>Optionally including profile images</li>
                     </ul>
-                    <li>Your lists (the ones you created)</li>
-                    <ul>
-                        <li>Optionally including member user profiles</li>
-                        <li>Optionally including member profile images</li>
-                    </ul>
+                    <li>Your lists (the ones you created) including user profiles / media</li>
+                    <li>Archive your Liked Tweets</li>
                     <li>Search within your downloaded data <a href="media/search.jpg">(see screenshot)</a></li>
                     <li>See your Tweets reverse chronological beginning with your first Tweets.</li>
                     <li>Sync, to download newer Tweets, mentions or responses</li>
+                    <li>Delete Tweets on Twitter</li>
+                    <li>Archive a different users profile / tweets</li>
                     <li>Runs on macOS, Linux and Windows. Can also run in the terminal.</li>
                     <li>Probably has a healthy set of bugs</li>
                 </ul>
+
             </section>
             <section>
                 <h2>Limitations</h2>
-
-                <p>
-                    Known Issue: The Windows version curently doesn't display media / images. They're being downloaded
-                    though.
-                </p>
 
                 <p>Due to API limitations, not all data can be archived. For every category, Twitter only returns a
                     certain amount of data:</p>
@@ -181,12 +171,8 @@
                     <li>Your Mentions: max 800</li>
                     <li>Follows / Followers: No idea, but at least 5000, probably more</li>
                     <li>Lists: Max 1000, max 5000 members per list</li>
+                    <li>No Bookmarks (yet)</li>
                 </ul>
-                <div class="alert">
-                    Note: I can't change the description of my API Key, so don't be confused that the app describes
-                    itself as
-                    SwiftWatch when you're authenticating with it.
-                </div>
             </section>
             <section>
                 <h2>Code</h2>
@@ -209,13 +195,13 @@
                         <img src="media/search.jpg" class="rounded" width="382" />
                     </a>
                 </div>
-                <h4>Linux</h4>
+                <h4>Linux (slightly outdated)</h4>
                 <div class="screenshot">
                     <a href="media/linux.jpg">
                         <img src="media/linux.jpg" class="rounded" width="382" />
                     </a>
                 </div>
-                <h4>Windows</h4>
+                <h4>Windows (slightly outdated)</h4>
                 <div class="screenshot">
                     <a href="media/windows.jpg">
                         <img src="media/windows.jpg" class="rounded" width="382" />
@@ -241,7 +227,7 @@ cargo build --release
                 </p>
             </section>
             <section>
-                <h2><a id="installation">Importing from an existing Archive</a></h2>
+                <h2><a>Importing from an existing Archive</a></h2>
                 <p>
                     If you already downloaded an existing Twitter Archive, you can use it to fill up any missing Tweets
                     in your TwitVault import.
@@ -264,6 +250,20 @@ cd /Applications/TwitVault.app/Contents/MacOS/
                 </div>
                 <p>
                     Afterwards, you can start TwitVault again and it will contain the Tweets.
+                </p>
+            </section>
+            <section>
+                <h2>Archiving another user, archiving multiple own accounts</h2>
+                <p>
+                    TwitVault can archive other user profiles as well as multiple of your own.
+                </p>
+                <p>
+                    Currently, this only works when you're running TwitVault in the Terminal / Commandline.
+                    However, once the data is archived, you can open it in the UI.
+                </p>
+                <p>
+                    [For an explanation of how that works, please refer to the GitHub
+                    documentation.](https://github.com/terhechte/twitvault)
                 </p>
             </section>
             <section>

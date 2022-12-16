@@ -52,11 +52,14 @@ pub struct Data {
     /// - Tweet Media: ExtendedUrlString
     /// - Profiles: Various Urls
     pub media: HashMap<UrlString, String>,
+    /// The likes the user performed
+    #[serde(default)]
+    pub likes: Vec<Tweet>,
 }
 
 impl Data {
     pub fn any_tweet(&self, id: TweetId) -> Option<&Tweet> {
-        for tweets in [&self.tweets, &self.mentions] {
+        for tweets in [&self.tweets, &self.mentions, &self.likes] {
             for t in tweets {
                 if t.id == id {
                     return Some(t);
@@ -115,6 +118,7 @@ impl Storage {
                 follows: Default::default(),
                 lists: Default::default(),
                 media: Default::default(),
+                likes: Default::default(),
             },
         )
     }
@@ -156,6 +160,7 @@ impl Storage {
     }
 }
 
+#[allow(unused)]
 #[derive(Clone)]
 pub struct MediaResolver<'a> {
     root_folder: PathBuf,
@@ -164,8 +169,18 @@ pub struct MediaResolver<'a> {
 
 impl<'a> MediaResolver<'a> {
     pub fn resolve(&self, url: &str) -> Option<String> {
-        let found = self.media.get(url)?;
-        let path = self.root_folder.join(found);
-        Some(path.display().to_string())
+        // if we're on windows, we just return the URL. Somehow the file locating
+        // trick we use with Dioxus doesn't work on Windows
+        #[cfg(target_os = "windows")]
+        {
+            Some(url.to_string())
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let found = self.media.get(url)?;
+            let path = self.root_folder.join(found);
+            Some(path.display().to_string())
+        }
     }
 }

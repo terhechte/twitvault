@@ -4,6 +4,7 @@ use dioxus::fermi::use_atom_state;
 use dioxus::prelude::*;
 use egg_mode::user::TwitterUser;
 
+use crate::config::Config;
 use crate::storage::MediaResolver;
 
 use super::main_component::{ColumnState, COLUMN2};
@@ -13,11 +14,12 @@ use super::tweet_component::TweetComponent;
 pub struct AuthorProps<'a> {
     profile: &'a TwitterUser,
     media: MediaResolver<'a>,
+    config: &'a Config,
 }
 
 pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
     let author = cx.props.profile;
-    let date = author.created_at.format("%d/%m/%Y %H:%M").to_string();
+    let date = author.created_at.format("%b %d %Y").to_string();
     let description = author.description.as_ref().cloned().unwrap_or_default();
     let followers = author.followers_count;
     let follows = author.friends_count;
@@ -63,13 +65,13 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
         .and_then(|(url, s)| url.domain().map(|e| (e.to_string(), s)))
         .map(|(domain, url)| {
             rsx!(a {
-                class: "btn btn-primary",
+                class: "btn btn-secondary btn-sm",
                 href: "{url}",
                 "Link: {domain}"
             })
         });
     let twitter_button = rsx!(a {
-        class: "btn btn-primary",
+        class: "btn btn-secondary btn-sm",
         href: "https://twitter.com/{author.screen_name}",
         "On Twitter"
     });
@@ -82,7 +84,8 @@ pub fn AuthorComponent<'a>(cx: Scope<'a, AuthorProps>) -> Element<'a> {
                     tweet: quoted,
                     media: cx.props.media.clone(),
                     user: cx.props.profile
-                    responses: None
+                    responses: None,
+                    config: cx.props.config
                 }
             })
         })

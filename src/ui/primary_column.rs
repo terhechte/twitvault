@@ -4,6 +4,8 @@ use std::borrow::Cow;
 
 use dioxus::prelude::*;
 
+use crate::config::Config;
+
 use super::list_list::ListListComponent;
 use super::main_component::Tab;
 use super::search_list::SearchComponent;
@@ -12,7 +14,12 @@ use super::types::StorageWrapper;
 use super::user_list::AuthorListComponent;
 
 #[inline_props]
-pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -> Element {
+pub fn MainColumn(
+    cx: Scope,
+    storage: StorageWrapper,
+    selected: UseState<Tab>,
+    config: Config,
+) -> Element {
     let current = (*selected.current()).clone();
     let label = current.to_string();
 
@@ -31,7 +38,8 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                         media: storage.resolver(),
                         label: label,
                         user: &storage.data().profile,
-                        responses: &storage.data().responses
+                        responses: &storage.data().responses,
+                        config: config
                     }
                 }
             }
@@ -47,7 +55,25 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                         media: storage.resolver(),
                         label: label.clone(),
                         user: &storage.data().profile,
-                        responses: &storage.data().responses
+                        responses: &storage.data().responses,
+                        config: config
+                    }
+                }
+            }
+        } else {rsx!{ div { }}}}
+        {if current == Tab::Likes {
+            let label = current.to_string();
+            rsx!{
+                div {
+                    class: "{column_class}",
+                    style: "{column_style}",
+                    TweetListComponent {
+                        data: &storage.data().likes,
+                        media: storage.resolver(),
+                        label: label.clone(),
+                        user: &storage.data().profile,
+                        responses: &storage.data().responses,
+                        config: config
                     }
                 }
             }
@@ -63,6 +89,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                         media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label.clone(),
+                        config: config
                     }
                 }
             }
@@ -78,6 +105,7 @@ pub fn MainColumn(cx: Scope, storage: StorageWrapper, selected: UseState<Tab>) -
                         media: storage.resolver(),
                         profiles: &storage.data().profiles,
                         label: label.clone(),
+                        config: config
                     }
                 }
             }
