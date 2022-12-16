@@ -2,7 +2,6 @@
 use std::cell::Cell;
 
 use dioxus::desktop::tao::dpi::LogicalSize;
-use dioxus::desktop::tao::platform::macos::WindowBuilderExtMacOS;
 use dioxus::desktop::tao::window::WindowBuilder;
 use dioxus::desktop::use_window;
 use dioxus::prelude::*;
@@ -27,6 +26,7 @@ pub fn run_ui(storage: Option<Storage>, config: Option<Config>) {
             c.with_window(default_menu).with_window(|w| {
                 #[cfg(target_os = "macos")]
                 {
+                    use dioxus::desktop::tao::platform::macos::WindowBuilderExtMacOS;
                     w.with_titlebar_transparent(false)
                         .with_title_hidden(false)
                         .with_title("TwitVault")
