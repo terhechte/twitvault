@@ -101,14 +101,13 @@ pub fn MainComponent(
             div {
                 class: "d-flex flex-column bg-dark",
                 style: "width: 4.2rem;",
-                span {
-                    class: "p-4",
-                    style: "margin-top: 12px;",
-                    i {
-                        class: "bi text-light",
-                        dangerous_inner_html: "{TWATVAULT_ICON}"
-                    }
-                }
+                // span {
+                //     class: "p-4",
+                //     i {
+                //         class: "bi text-light",
+                //         dangerous_inner_html: "{TWATVAULT_ICON}"
+                //     }
+                // }
                 NavElement {
                     label: Tab::Tweets,
                     selected: selected.clone()

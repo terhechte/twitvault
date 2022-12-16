@@ -27,9 +27,9 @@ pub fn run_ui(storage: Option<Storage>, config: Option<Config>) {
             c.with_window(default_menu).with_window(|w| {
                 #[cfg(target_os = "macos")]
                 {
-                    w.with_fullsize_content_view(true)
-                        .with_titlebar_transparent(true)
-                        .with_title_hidden(true)
+                    w.with_titlebar_transparent(false)
+                        .with_title_hidden(false)
+                        .with_title("TwitVault")
                 }
                 #[cfg(not(target_os = "macos"))]
                 {
