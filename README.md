@@ -143,6 +143,6 @@ The location of your data depends on your operating system:
 
 - Linux: `/home/username/.config/twitvault`
 - Windows: `C:\Users\Username\AppData\Roaming\StyleMac\TwitVault\config`
-- macOS: `/Users/username/Application Support/com.StyleMac.TwitVault`
+- macOS: `/Users/username/Application Support/com.StyleMac.TwitVault` or `/Users/username/Library/Application Support/com.StyleMac.TwitVault`
 
 Testing these kinds of things under three different operating systems is kinda hard. So there might be bugs.
